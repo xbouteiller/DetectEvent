@@ -110,6 +110,8 @@ myflask
 env
 venv
 ENV
+mydetect/
+mydetect
 # Spyder project settings
 .spyderproject
 .spyproject
