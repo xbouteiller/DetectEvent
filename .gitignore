@@ -112,6 +112,8 @@ venv
 ENV
 mydetect/
 mydetect
+.ipynb_checkpoints
+.ipynb_checkpoints/
 # Spyder project settings
 .spyderproject
 .spyproject
