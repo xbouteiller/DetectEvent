@@ -28,12 +28,12 @@ SEP = ','
 TIME_COL = 'date_time'
 SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
-WIND_DIV = 5
-LAG_DIV = WIND_DIV * 10
+WIND_DIV = 4
+LAG_DIV = WIND_DIV * 15
 BOUND = 'NotSet'
-FRAC = 0.15
-DELT_MULTI = 0.01
-PAUSE_GRAPH = 10
+FRAC_P = 0.1
+DELTA_MULTI = 0.01
+PAUSE_GRAPH = 3
 
 class ParseFile():
     import pandas as pd
@@ -294,6 +294,7 @@ class ParseTreeFolder():
         return rmse
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
+        Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-window+1
         start = np.arange(0, Xmax, lag)
         ########################################################################
@@ -308,8 +309,8 @@ class ParseTreeFolder():
 
         if mode == 'linear':
             mean_start = X[[int(s + window/2) for s in start]]
-            score = [self._fit_and_pred(X[s:s+window], y[s:s+window], mode) 
-                    for s in start]    
+            score = [self._fit_and_pred(X[Xend-s-window:Xend], y[Xend-s-window:Xend], mode) 
+                    for s in start[::-1]]    
             return score, mean_start
         
         if mode == 'exp':
@@ -327,7 +328,7 @@ class ParseTreeFolder():
             essai_exp = 0
             while essai_exp == 0:
                 try:
-                    score = [self._fit_and_pred(X[s:s+window], y[s:s+window], mode, bound) 
+                    score = [self._fit_and_pred(X[0:s+window], y[0:s+window], mode, bound) 
                             for s in start]
                     essai_exp+=1
                 except:
@@ -475,7 +476,7 @@ class ParseTreeFolder():
     def _change_det(self, df):
 
         if df.shape[0] < 100:
-            _wind = int(df.shape[0]/2)
+            _wind = int(df.shape[0]/6)
             _lag = 1# int(df.shape[0]/4)
         else:
             _wind = int(df.shape[0]/WIND_DIV)
@@ -501,8 +502,8 @@ class ParseTreeFolder():
 
 
 
-    def _smoother(self, ex, end, fr):
-        delt = DELT_MULTI * ex.shape[0]
+    def _smoother(self, ex, end, fr, delta_multi):
+        delt = delta_multi * ex.shape[0]
         Ysmooth = lowess(exog = ex, endog = end, frac = fr, delta = delt, return_sorted = False)
         return Ysmooth
 
@@ -519,12 +520,13 @@ class ParseTreeFolder():
 
             self.Xselected = df['delta_time'].values
             self.yselected = df[YVAR].copy().values
-            self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC)
+            print(FRAC_P)
+            self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
             plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
             plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
             plt.legend()    
-            plt.pause(PAUSE_GRAPH/2)
+            plt.pause(PAUSE_GRAPH/10)
             plt.close()   
             print('''
             Do you want to work on smoothed data ?
@@ -543,22 +545,23 @@ class ParseTreeFolder():
                 while True:          
                     while True:
                         try:
-                            FR= float(input('What is the frac value (default = {} ? '.format(FRAC)))
+                            
+                            _FRAC = float(input('What is the frac value ? '))
                             break
                         except ValueError:
                             print("Oops!  That was no valid number.  Try again...")
                     while True:
                         try:
-                            DELT_MULTI= float(input('What is the delta value (default = {} ? '.format(DELT_MULTI)))
+                            _DELTA_MULTI= float(input('What is the delta value ? '))
                             break
                         except ValueError:
                             print("Oops!  That was no valid number.  Try again...")
 
-                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FR)
+                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = _FRAC, delta_multi = _DELTA_MULTI)
                     plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
                     plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
                     plt.legend()    
-                    plt.pause(PAUSE_GRAPH/2)
+                    plt.pause(PAUSE_GRAPH/10)
                     plt.close()   
                     print('''
                     Do you want to keep this values?
