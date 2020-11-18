@@ -30,9 +30,10 @@ SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
 WIND_DIV = 5
 LAG_DIV = WIND_DIV * 10
-BOUND = ([0.0,  0.0], [0.,  0.0])
-
-
+BOUND = 'NotSet'
+FRAC = 0.15
+DELT_MULTI = 0.01
+PAUSE_GRAPH = 10
 
 class ParseFile():
     import pandas as pd
@@ -100,26 +101,30 @@ class ParseTreeFolder():
         print('''
         WELCOME TO LEAFCONDUCTANCE
 
-        Type 1 to start and parse a folder
-
-        1: Parse a folder
+        Press Enter to continue ...
+        
         ''')
-        self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
-
+        self.file_or_folder = '1'
+        input('')
+        # self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
         if self.file_or_folder== '1':
-            Tk().withdraw()
-            folder = askdirectory(title='What is the root folder that you want to parse ?')
+            ################################################### REACTIVATE
+            #Tk().withdraw()
+            #folder = askdirectory(title='What is the root folder that you want to parse ?')
+            folder = '/home/xavier/Documents/development/DetectEvent/data'
+            #####################################################""
             self.path = folder
             print('\n\n\nroot path is {}'.format(self.path))
+            ################################################### REACTIVATE
+            # print('''
+            # which method do you want to use for detecting cavisoft files ?
 
-            print('''
-            which method do you want to use for detecting cavisoft files ?
-
-            1: Detect all CSV files 
-            2: Detect string 'CONDUCTANCE' string in the first row
-            ''')
-            self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-
+            # 1: Detect all CSV files 
+            # 2: Detect string 'CONDUCTANCE' string in the first row
+            # ''')
+            # self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+            self.method_choice = '2' 
+            ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
 
 
@@ -250,60 +255,140 @@ class ParseTreeFolder():
     def _RMSE(self, Ypred, Yreal):
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
         return rmse
-    def _fit_and_pred(self,X, y):
-        from sklearn.linear_model import LinearRegression
-        Xarr = np.array(X).reshape(-1,1)
-        yarr = np.array(y).reshape(-1,1)
-        reg = LinearRegression().fit(Xarr, yarr)
-        pred = reg.predict(Xarr)
+
+    def _fit_and_pred(self,X, y, mode, *args):
+
+        if mode == 'linear':
+            Xarr = np.array(X).reshape(-1,1)
+            yarr = np.array(y).reshape(-1,1)
+            reg = LinearRegression().fit(Xarr, yarr)
+            pred = reg.predict(Xarr)
+        if mode == 'exp':
+            Xarr = np.array(X).reshape(-1)
+            yarr = np.array(y).reshape(-1)
+            reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
+            A, B = reg     
+            pred = A * np.exp(-B * Xarr)
+        if mode == 'nobound':
+            Xarr = np.array(X).reshape(-1)
+            yarr = np.array(y).reshape(-1)
+            reg = curve_fit(self._func, Xarr, yarr)[0]                                         
+            A, B = reg     
+            pred = A * np.exp(-B * Xarr)
+        if mode == 'linear_constrained':
+            # reg = curve_fit(self._func_lin, Xarr, yarr, bounds=self.bound)[0]                                         
+            # A, B = reg
+            ########################################################################
+            Xarr = np.array(X).reshape(-1)
+            yarr = np.array(y).reshape(-1)
+            A = args[0]
+            B = args[1]
+            print('A ', A)
+            print('B ', B)
+            ########################################################################     
+            pred = A *  Xarr + B   
         rmse = self._RMSE(pred, yarr)
+        ########################################################################
+        print('rmse', rmse)
+        ########################################################################
         return rmse
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xmax = np.shape(X)[0]-window+1
         start = np.arange(0, Xmax, lag)
+        ########################################################################
+        # print('xmax', Xmax)
+        # print('start' , start)
+        # print([X[s] \
+        #             for s in start])
+
+        # print(self._fit_and_pred(X[0:10], y[0:10], 'linear'))  
+        # input()
+        ########################################################################
 
         if mode == 'linear':
             mean_start = X[[int(s + window/2) for s in start]]
-            score = [self._fit_and_pred(X[s:s+window], y[s:s+window]) 
+            score = [self._fit_and_pred(X[s:s+window], y[s:s+window], mode) 
                     for s in start]    
             return score, mean_start
         
         if mode == 'exp':
             mean_start = X[[int(s + window/2) for s in start]]
             
-            if BOUND == ([0.0,  0.0], [0.,  0.0]):
-                reg = curve_fit(self._func, X[lag:lag+window], y[lag:lag+window])[0]
+            if BOUND == 'NotSet':
+                reg = self._detect_b( X[lag:lag+window*2], y[lag:lag+window*2], mode)
                 A, B = reg 
-                b = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+                bound = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+                ########################################################################
+                print('bound', bound)
+                ########################################################################
             else:
                 b=BOUND
+            essai_exp = 0
+            while essai_exp == 0:
+                try:
+                    score = [self._fit_and_pred(X[s:s+window], y[s:s+window], mode, bound) 
+                            for s in start]
+                    essai_exp+=1
+                except:
+                    print('''
+                            Fitting failed
+                            What do you want to do ?
 
-            score = [fit_and_pred_exp(X[s:s+window], y[s:s+window], b=b, p = p) 
-                    for s in start]    
-        
+                            1. Fit exp curve without bound parameters
+                            2. Fit constrained linear model
+                            3. Escape                          
+                            ''')
+                            
+                    myfitchoice = self._get_valid_input('What is your choice ? ', ('1','2','3'))
+
+                    if myfitchoice == '1':
+                        try:
+                            score = [self._fit_and_pred(X[s:s+window], y[s:s+window], 'nobound') 
+                                    for s in start]
+                            essai_exp+=1
+                        except:
+                            pass
+                            
+                    if myfitchoice == '2':
+                        try:
+                            reg = self._detect_b( X[lag:lag+window], y[lag:lag+window], 'linear')
+                            A, B = reg 
+                            # self.bound = ([A/10,B-1],[A*10, B+1])
+                            score = [self._fit_and_pred(X[s:s+window*2], y[s:s+window*2], 'linear_constrained', A, B) 
+                                    for s in start]
+                            essai_exp+=1
+                        except:
+                            pass
+
+                    if myfitchoice == '3':
+                        score = [-99.0]
+                        essai_exp+=1
+                        
+        ########################################################################
+        print('score', score)
+        ########################################################################
+
         return score, mean_start
 
 
     def _func(self, x, a, b):
         return a * np.exp(-b * x) 
+
+    def _func_lin(self, x, a, b):
+        return a * x + b 
     
-    def _detect_b(self, X, y):
+    def _detect_b(self, X, y, mode):
         Xarr = np.array(X).reshape(-1)
         yarr = np.array(y).reshape(-1)
-        reg = curve_fit(func, Xarr, yarr)[0]
-
-
-
-    def _fit_and_pred_exp(self, X, y):
-        Xarr = np.array(X).reshape(-1)
-        yarr = np.array(y).reshape(-1)
-        b=self._detect_b(Xarr,yarr)
-        reg = curve_fit(self._func, Xarr, yarr, bounds=b)[0]
-        A, B = reg     
-        pred = A * np.exp(-B * Xarr)
-        rmse = RMSE(pred, yarr)
-        return rmse
+        if mode == 'exp':
+            reg = curve_fit(self._func, Xarr, yarr)[0]
+        if mode == 'linear':
+            reg = curve_fit(self._func_lin, Xarr, yarr)[0]
+        ########################################################################
+        print('detected ',reg)
+        ########################################################################
+        return reg
 
     def _dcross(self, Yl, Ye):
         idx = np.argwhere(np.diff(np.sign(Yl - Ye))).flatten() 
@@ -320,13 +405,46 @@ class ParseTreeFolder():
         Xidx_int = [[X[i], X[i+1] ]for i in idx]
         Yidx=Ylin[idx]
 
-        
-        plt.plot(X, Ylin)
-        plt.plot(X, Yexp)
-        
+
+
+
+
+        fig, ax1 = plt.subplots()
+
+        color = 'tab:blue'
+        ax1.set_xlabel('time (min)')
+        ax1.set_ylabel(self.sample, color=color)
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='o', label = 'data')
+        color = 'tab:red'
+        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+        color = 'tab:green'
+        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+        ax2.plot(X, Ylin, color=color, marker='o', label = 'RMSE lin')
+        ax2.tick_params(axis='y', labelcolor=color)
+        color = 'tab:orange'
+        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+        ax2.plot(X, Yexp, color=color, marker='o', label = 'RMSE exp')
+        ax2.tick_params(axis='y', labelcolor=color)
+        plt.legend()
         for i in np.arange(0,len(idx)):
-            plt.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'red')
-        plt.show()     
+            ax2.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'black')
+        fig.tight_layout()
+        plt.pause(PAUSE_GRAPH)
+        plt.close()   
+
+
+
+        # plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'data')
+        # plt.plot(X, Ylin, linestyle='-', marker='o', label = 'RMSE lin')
+        # plt.plot(X, Yexp, linestyle='-', marker='o', label = 'RMSE exp')
+        # plt.legend()
+        # for i in np.arange(0,len(idx)):
+        #     plt.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'red')
+        # plt.show()     
         
         print('\nInterval method')
         for i in np.arange(0,len(idx)):
@@ -335,45 +453,138 @@ class ParseTreeFolder():
         print('''
             Do you want to keep the crossing value ?
 
-            1: No, discard 
-            2: Yes, save
+            1: Yes, save
+            2: No, discard
             3. Select value manually on graph (WORK IN PROGRESS)
             ''')
         what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-    
-        if what_to_do=='1':
-            self.global_score.append([self.sample,'Discarded', 'Discarded'])
+        ########################################################################
+        print('gs',self.global_score)        
+        ########################################################################
         if what_to_do=='2':
-            self.global_score.append([self.sample,Xidx_int[0], Xidx_int[1]])
-
+            self.global_score.append([self.sample,'Discarded', 'Discarded'])
+        if what_to_do=='1':
+            self.global_score.append([self.sample, Xidx, Xidx_int])
+        ########################################################################
+        # print('score',[self.sample,Xidx_int[0], Xidx_int[1]])
+        print('gs',self.global_score)
+        # input()
+        ########################################################################
         return idx, Xidx, Xidx_int 
 
     def _change_det(self, df):
 
         if df.shape[0] < 100:
             _wind = int(df.shape[0]/2)
-            _lag = int(df.shape[0]/4)
+            _lag = 1# int(df.shape[0]/4)
         else:
             _wind = int(df.shape[0]/WIND_DIV)
             _lag = int(df.shape[0]/LAG_DIV)
         _X = df['delta_time']
         _y = df[YVAR]
-
+        ########################################################################
+        print('head', df.head())
+        print('sample', df[SAMPLE_ID].unique())
+        print('wind : ', _wind)
+        print('lag : ',_lag)
+        print('x : ',_X[0:5])
+        print('y : ',_y[0:5])
+        # input()
+        ########################################################################
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
+
+        score_l = (score_l - np.mean(score_l)) / np.std(score_l)
+        score_e = (score_e - np.mean(score_e)) / np.std(score_e)
+
         idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l)
-   
+
+
+
+    def _smoother(self, ex, end, fr):
+        delt = DELT_MULTI * ex.shape[0]
+        Ysmooth = lowess(exog = ex, endog = end, frac = fr, delta = delt, return_sorted = False)
+        return Ysmooth
+
     def _parse_samples(self, dffile, FUNC): 
         import pandas as  pd
         import numpy as np       
 
         for sample in dffile[SAMPLE_ID].unique():
             self.sample = sample
-            df = dffile.loc[dffile[SAMPLE_ID]==sample,:].copy()
+            df = dffile.loc[dffile[SAMPLE_ID]==sample,:].copy().reset_index()
             df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
-            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'].shift()).fillna(0.0)   
-            df['delta_time'] = df['delta_time'].apply(np.float32)         
+            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+            df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+
+            self.Xselected = df['delta_time'].values
+            self.yselected = df[YVAR].copy().values
+            self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC)
+
+            plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
+            plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
+            plt.legend()    
+            plt.pause(PAUSE_GRAPH/2)
+            plt.close()   
+            print('''
+            Do you want to work on smoothed data ?
+
+            1: Yes
+            2: Yes, But I want to adjust smoothing parameters
+            3: No            
+            ''')
+
+            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
+   
+            ########################################################################
+            if what_to_do=='1':
+                df[YVAR] = self.Ysmooth
+            if what_to_do=='2':
+                while True:          
+                    while True:
+                        try:
+                            FR= float(input('What is the frac value (default = {} ? '.format(FRAC)))
+                            break
+                        except ValueError:
+                            print("Oops!  That was no valid number.  Try again...")
+                    while True:
+                        try:
+                            DELT_MULTI= float(input('What is the delta value (default = {} ? '.format(DELT_MULTI)))
+                            break
+                        except ValueError:
+                            print("Oops!  That was no valid number.  Try again...")
+
+                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FR)
+                    plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
+                    plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
+                    plt.legend()    
+                    plt.pause(PAUSE_GRAPH/2)
+                    plt.close()   
+                    print('''
+                    Do you want to keep this values?
+
+                    1: Yes
+                    2: No            
+                    ''')
+                    what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+                    if what_to_do == '1':
+                        break
+                    if what_to_do == '2':
+                        pass
+                df[YVAR] = self.Ysmooth
+            if what_to_do=='3':
+                pass
+            ########################################################################
+            print('head', df.head())
+            print('sample', df[SAMPLE_ID].unique()) 
+
+            print('Xsel',self.Xselected)
+            print('ysel',self.yselected)
+            #input()
+            ########################################################################      
             FUNC(df)
+         
+
 
     def change_detection(self):
         print('change_detection\n')
@@ -398,21 +609,21 @@ class ParseTreeFolder():
                     else:
                         skip=0
                     try:
-                        df = ParseFile(path = elem, skipr=skip).clean_file()
+                        dffile = ParseFile(path = elem, skipr=skip).clean_file()
                     except:
                         encodi='latin'
-                        df = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
+                        dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
 
-                    if df.shape[1] == 1:
+                    if dffile.shape[1] == 1:
                         separ=';'
                         try:
-                            df = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
+                            dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
                         except:
                             encodi='latin'
-                            df = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+                            dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
 
-
-                    self._parse_samples(dffile = df, FUNC = self._change_det)
+                    # self._parse_samples2(dffile=dffile)
+                    self._parse_samples(dffile = dffile, FUNC = self._change_det)
 
 
 
