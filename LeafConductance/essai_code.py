@@ -82,6 +82,7 @@ class ParseFile():
 
 class ParseTreeFolder():
 
+
     def _get_valid_input(self, input_string, valid_options):
         input_string += "({}) ".format(", ".join(valid_options))
         response = input(input_string)
@@ -308,16 +309,17 @@ class ParseTreeFolder():
         ########################################################################
 
         if mode == 'linear':
-            mean_start = X[[int(s + window/2) for s in start]]
-            score = [self._fit_and_pred(X[Xend-s-window:Xend], y[Xend-s-window:Xend], mode) 
-                    for s in start[::-1]]    
+            # mean_start = X[[int(s + window/2) for s in start]]
+            mean_start = X[[int((Xend-s+ Xend)/2) for s in start[::-1]]]
+            score = [self._fit_and_pred(X[Xend-window:Xend], y[Xend-s:Xend], mode) 
+                    for s in start[::-1]]    #[::-1]
             return score, mean_start
         
         if mode == 'exp':
-            mean_start = X[[int(s + window/2) for s in start]]
-            
+            # mean_start = X[[int(s + window/2) for s in start]]
+            mean_start = X[[int((s + window)/2) for s in start]]
             if BOUND == 'NotSet':
-                reg = self._detect_b( X[lag:lag+window*2], y[lag:lag+window*2], mode)
+                reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
                 A, B = reg 
                 bound = ([A-0.1*A,B/10],[A+0.1*A, B*10])
                 ########################################################################
@@ -328,7 +330,7 @@ class ParseTreeFolder():
             essai_exp = 0
             while essai_exp == 0:
                 try:
-                    score = [self._fit_and_pred(X[0:s+window], y[0:s+window], mode, bound) 
+                    score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
                             for s in start]
                     essai_exp+=1
                 except:
@@ -434,7 +436,9 @@ class ParseTreeFolder():
         for i in np.arange(0,len(idx)):
             ax2.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'black')
         fig.tight_layout()
-        plt.pause(PAUSE_GRAPH)
+        # plt.pause(PAUSE_GRAPH)
+        plt.waitforbuttonpress(0)
+        # input()
         plt.close()   
 
 
@@ -521,12 +525,15 @@ class ParseTreeFolder():
             self.Xselected = df['delta_time'].values
             self.yselected = df[YVAR].copy().values
             print(FRAC_P)
+            print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
             plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
             plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
             plt.legend()    
-            plt.pause(PAUSE_GRAPH/10)
+            # plt.pause(PAUSE_GRAPH/10)
+            plt.waitforbuttonpress(0)
+            # input()
             plt.close()   
             print('''
             Do you want to work on smoothed data ?
@@ -534,34 +541,40 @@ class ParseTreeFolder():
             1: Yes
             2: Yes, But I want to adjust smoothing parameters
             3: No            
-            ''')
+            ''') 
 
             what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
-   
             ########################################################################
             if what_to_do=='1':
                 df[YVAR] = self.Ysmooth
             if what_to_do=='2':
                 while True:          
                     while True:
+                        
                         try:
-                            
-                            _FRAC = float(input('What is the frac value ? '))
+                            _FRAC=0.1
+                            FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)))
+                            _FRAC = FRAC_P2
                             break
                         except ValueError:
-                            print("Oops!  That was no valid number.  Try again...")
+                            print("Oops!  That was no valid number.  Try again...")                    
                     while True:
+
                         try:
-                            _DELTA_MULTI= float(input('What is the delta value ? '))
+                            _DELTA_MULTI=0.01
+                            DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)))
+                            _DELTA_MULTI = DELTA_MULTI2
                             break
                         except ValueError:
                             print("Oops!  That was no valid number.  Try again...")
 
-                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = _FRAC, delta_multi = _DELTA_MULTI)
+                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P2, delta_multi = DELTA_MULTI2)
                     plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
                     plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
                     plt.legend()    
-                    plt.pause(PAUSE_GRAPH/10)
+                    # plt.pause(PAUSE_GRAPH/10)
+                    plt.waitforbuttonpress(0)
+                    # input()
                     plt.close()   
                     print('''
                     Do you want to keep this values?
