@@ -28,7 +28,7 @@ SEP = ','
 TIME_COL = 'date_time'
 SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
-WIND_DIV = 4
+WIND_DIV = 5
 LAG_DIV = WIND_DIV * 15
 BOUND = 'NotSet'
 FRAC_P = 0.1
@@ -251,7 +251,9 @@ class ParseTreeFolder():
 
  
 
-
+    def _min_max(self, X): 
+        X_scaled = (X-np.min(X)) / (np.max(X) -  np.min(X))
+        return X_scaled
 
     def _RMSE(self, Ypred, Yreal):
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
@@ -297,10 +299,12 @@ class ParseTreeFolder():
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-lag-1
-        start = np.arange(0, Xmax, lag)
+        start = np.arange(window, Xmax, lag)
+        print('start', start)
         ########################################################################
         # print('xmax', Xmax)
         # print('start' , start)
+        # print('Xend', Xend)
         # print([X[s] \
         #             for s in start])
 
@@ -309,71 +313,48 @@ class ParseTreeFolder():
         ########################################################################
 
         if mode == 'linear':
+
             # mean_start = X[[int(s + window/2) for s in start]]
-            mean_start = X[[int((Xend-s-window+ Xend)/2) for s in start[::-1]]]
-            score = [self._fit_and_pred(X[Xend-s-window:Xend], y[Xend-s-window:Xend], mode) 
-                    for s in start[::-1]]    #[::-1]
+            # mean_start = X[[int(np.floor((Xend-s+ Xend)/2)) for s in start]]
+            mean_start = X[[int(Xend-s) for s in start]]
+            # print('lin idx', [int(np.floor((Xend-s+ Xend)/2)) for s in start])
+            # print('mean start LIN',mean_start)
+            # input()
+            score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
+                    for s in start]    #[::-1]
             return score, mean_start
         
         if mode == 'exp':
             # mean_start = X[[int(s + window/2) for s in start]]
-            mean_start = X[[int((s + window)/2) for s in start]]
+            # mean_start = X[[int(np.floor(s/2)) for s in start]]
+            mean_start = X[start]
+            # print('exp idx', [int(np.floor(s/2)) for s in start])
+            # print('mean start EXP',mean_start)
+            # input()
             if BOUND == 'NotSet':
-                reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
-                A, B = reg 
-                bound = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+                try:
+                    reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
+                    A, B = reg 
+                    bound = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+                except:
+                    bound = ([0*A,1/1000000],[100, 1/100])
                 ########################################################################
                 print('bound', bound)
                 ########################################################################
             else:
-
-                b=BOUND
-            essai_exp = 0
-            while essai_exp == 0:
+                b=BOUND           
                 try:
-                    score = [self._fit_and_pred(X[0:s+window], y[0:s+window], mode, bound) 
+                    score = [self._fit_and_pred(X[s:s+window], y[s:s+window], 'nobound') 
                             for s in start]
                     essai_exp+=1
                 except:
-                    print('''
-                            Fitting failed
-                            What do you want to do ?
+                    raise Exception('Incorrect exp fitting')
+   
+            ########################################################################
+            print('score', score)
+            ########################################################################
 
-                            1. Fit exp curve without bound parameters
-                            2. Fit constrained linear model
-                            3. Escape                          
-                            ''')
-                            
-                    myfitchoice = self._get_valid_input('What is your choice ? ', ('1','2','3'))
-
-                    if myfitchoice == '1':
-                        try:
-                            score = [self._fit_and_pred(X[s:s+window], y[s:s+window], 'nobound') 
-                                    for s in start]
-                            essai_exp+=1
-                        except:
-                            pass
-                            
-                    if myfitchoice == '2':
-                        try:
-                            reg = self._detect_b( X[lag:lag+window], y[lag:lag+window], 'linear')
-                            A, B = reg 
-                            # self.bound = ([A/10,B-1],[A*10, B+1])
-                            score = [self._fit_and_pred(X[s:s+window*2], y[s:s+window*2], 'linear_constrained', A, B) 
-                                    for s in start]
-                            essai_exp+=1
-                        except:
-                            pass
-
-                    if myfitchoice == '3':
-                        score = [-99.0]
-                        essai_exp+=1
-                        
-        ########################################################################
-        print('score', score)
-        ########################################################################
-
-        return score, mean_start
+            return score, mean_start
 
 
     def _func(self, x, a, b):
@@ -398,19 +379,16 @@ class ParseTreeFolder():
         idx = np.argwhere(np.diff(np.sign(Yl - Ye))).flatten() 
         return idx
 
-    def _detect_crossing_int(self, Yexp, Ylin, X):
+    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe):
         Ylin=np.array(Ylin)
         Yexp=np.array(Yexp)
-        X=np.array(X)  
-        
+        Xl=np.array(Xl)  
+        Xe=np.array(Xe) 
         idx = self._dcross(Ylin, Yexp)
-        Xidx=X[idx]    
+        Xidx=Xe[idx]    
         idx_int = [[i, i+1] for i in idx]
-        Xidx_int = [[X[i], X[i+1] ]for i in idx]
-        Yidx=Ylin[idx]
-
-
-
+        Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
+        Yidx=Yexp[idx]
 
 
         fig, ax1 = plt.subplots()
@@ -427,11 +405,11 @@ class ParseTreeFolder():
 
         color = 'tab:green'
         ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-        ax2.plot(X, Ylin, color=color, marker='o', label = 'RMSE lin')
+        ax2.plot(Xl, Ylin, color=color, marker='o', label = 'RMSE lin')
         ax2.tick_params(axis='y', labelcolor=color)
         color = 'tab:orange'
         ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-        ax2.plot(X, Yexp, color=color, marker='o', label = 'RMSE exp')
+        ax2.plot(Xe, Yexp, color=color, marker='o', label = 'RMSE exp')
         ax2.tick_params(axis='y', labelcolor=color)
         plt.legend()
         for i in np.arange(0,len(idx)):
@@ -478,6 +456,8 @@ class ParseTreeFolder():
         ########################################################################
         return idx, Xidx, Xidx_int 
 
+
+    
     def _change_det(self, df):
 
         if df.shape[0] < 100:
@@ -503,7 +483,7 @@ class ParseTreeFolder():
         score_l = (score_l - np.mean(score_l)) / np.std(score_l)
         score_e = (score_e - np.mean(score_e)) / np.std(score_e)
 
-        idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l)
+        idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l, mean_start_e)
 
 
 
