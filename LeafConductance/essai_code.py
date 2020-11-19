@@ -322,7 +322,6 @@ class ParseTreeFolder():
             # input()
             score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
                     for s in start]    #[::-1]
-            return score, mean_start
         
         if mode == 'exp':
             # mean_start = X[[int(s + window/2) for s in start]]
@@ -342,19 +341,20 @@ class ParseTreeFolder():
                 print('bound', bound)
                 ########################################################################
             else:
-                b=BOUND           
-                try:
-                    score = [self._fit_and_pred(X[s:s+window], y[s:s+window], 'nobound') 
-                            for s in start]
-                    essai_exp+=1
-                except:
-                    raise Exception('Incorrect exp fitting')
-   
-            ########################################################################
-            print('score', score)
-            ########################################################################
+                bound=BOUND
 
-            return score, mean_start
+            try:
+                score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
+                        for s in start]
+            except:
+                raise Exception 'Failed to fit Exponential curve'
+                        
+        ########################################################################
+        print('score', score)
+        ########################################################################
+
+        score = self._min_max(score)
+        return score, mean_start
 
 
     def _func(self, x, a, b):
