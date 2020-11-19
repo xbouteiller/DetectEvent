@@ -28,8 +28,8 @@ SEP = ','
 TIME_COL = 'date_time'
 SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
-WIND_DIV = 5
-LAG_DIV = WIND_DIV * 15
+WIND_DIV = 8
+LAG_DIV = WIND_DIV * 45
 BOUND = 'NotSet'
 FRAC_P = 0.1
 DELTA_MULTI = 0.01
@@ -260,7 +260,6 @@ class ParseTreeFolder():
         return rmse
 
     def _fit_and_pred(self,X, y, mode, *args):
-
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
@@ -269,6 +268,8 @@ class ParseTreeFolder():
         if mode == 'exp':
             Xarr = np.array(X).reshape(-1)
             yarr = np.array(y).reshape(-1)
+            print(args[0])
+            #input()
             reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
             A, B = reg     
             pred = A * np.exp(-B * Xarr)
@@ -297,7 +298,6 @@ class ParseTreeFolder():
         ########################################################################
 
         if mode == 'linear':
-
             # mean_start = X[[int(s + window/2) for s in start]]
             # mean_start = X[[int(np.floor((Xend-s+ Xend)/2)) for s in start]]
             mean_start = X[[int(Xend-s) for s in start]]
@@ -317,10 +317,11 @@ class ParseTreeFolder():
             if BOUND == 'NotSet':
                 try:
                     reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
-                    A, B = reg 
-                    bound = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+                    Aa, Bb = reg 
+                    bound = ([Aa-0.1*Aa,Bb/10],[Aa+0.1*Aa, Bb*10])
+                    bound = ([Aa-0.5*Aa,Bb/100],[Aa+0.5*Aa, Bb*100])
                 except:
-                    bound = ([0*A,1/1000000],[100, 1/100])
+                    bound = ([0,1/1000000],[100, 1/100])
                 ########################################################################
                 print('bound', bound)
                 ########################################################################
@@ -334,10 +335,11 @@ class ParseTreeFolder():
                 raise Exception('Failed to fit Exponential curve')
                         
         ########################################################################
-        print('score', score)
+        #print('{} score'.format(mode), score)
         ########################################################################
 
         score = self._min_max(score)
+        print('{} score'.format(mode), score)
         return score, mean_start
 
 
@@ -352,8 +354,8 @@ class ParseTreeFolder():
         yarr = np.array(y).reshape(-1)
         if mode == 'exp':
             reg = curve_fit(self._func, Xarr, yarr)[0]
-        if mode == 'linear':
-            reg = curve_fit(self._func_lin, Xarr, yarr)[0]
+        # if mode == 'linear':
+        #     reg = curve_fit(self._func_lin, Xarr, yarr)[0]
         ########################################################################
         print('detected ',reg)
         ########################################################################
@@ -446,8 +448,8 @@ class ParseTreeFolder():
         else:
             _wind = int(df.shape[0]/WIND_DIV)
             _lag = int(df.shape[0]/LAG_DIV)
-        _X = df['delta_time']
-        _y = df[YVAR]
+        _X = df['delta_time'].copy().values
+        _y = df[YVAR].copy().values
         ########################################################################
         print('head', df.head())
         print('sample', df[SAMPLE_ID].unique())
@@ -460,7 +462,7 @@ class ParseTreeFolder():
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
   
-        idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l, mean_start_e)
+        idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
 
 
 
@@ -504,7 +506,7 @@ class ParseTreeFolder():
             what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
             ########################################################################
             if what_to_do=='1':
-                df[YVAR] = self.Ysmooth
+                df[YVAR] = self.Ysmooth.copy()
             if what_to_do=='2':
                 while True:          
                     while True:
@@ -545,7 +547,7 @@ class ParseTreeFolder():
                         break
                     if what_to_do == '2':
                         pass
-                df[YVAR] = self.Ysmooth
+                df[YVAR] = self.Ysmooth.copy()
             if what_to_do=='3':
                 pass
             ########################################################################
