@@ -296,7 +296,7 @@ class ParseTreeFolder():
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xend = np.shape(X)[0]
-        Xmax = np.shape(X)[0]-window+1
+        Xmax = np.shape(X)[0]-lag-1
         start = np.arange(0, Xmax, lag)
         ########################################################################
         # print('xmax', Xmax)
@@ -310,9 +310,9 @@ class ParseTreeFolder():
 
         if mode == 'linear':
             # mean_start = X[[int(s + window/2) for s in start]]
-            mean_start = X[[int((Xend-s+ Xend)/2) for s in start[::-1]]]
-            score = [self._fit_and_pred(X[Xend-window:Xend], y[Xend-s:Xend], mode) 
-                    for s in start[::-1]]    #[::-1]
+            mean_start = X[[int((Xend-s+ Xend)/2) for s in start]]
+            score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
+                    for s in start]    #[::-1]
             return score, mean_start
         
         if mode == 'exp':
@@ -330,7 +330,7 @@ class ParseTreeFolder():
             essai_exp = 0
             while essai_exp == 0:
                 try:
-                    score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
+                    score = [self._fit_and_pred(X[0:s+window], y[0:s+window], mode, bound) 
                             for s in start]
                     essai_exp+=1
                 except:
