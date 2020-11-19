@@ -272,23 +272,7 @@ class ParseTreeFolder():
             reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
             A, B = reg     
             pred = A * np.exp(-B * Xarr)
-        if mode == 'nobound':
-            Xarr = np.array(X).reshape(-1)
-            yarr = np.array(y).reshape(-1)
-            reg = curve_fit(self._func, Xarr, yarr)[0]                                         
-            A, B = reg     
-            pred = A * np.exp(-B * Xarr)
-        if mode == 'linear_constrained':
-            # reg = curve_fit(self._func_lin, Xarr, yarr, bounds=self.bound)[0]                                         
-            # A, B = reg
-            ########################################################################
-            Xarr = np.array(X).reshape(-1)
-            yarr = np.array(y).reshape(-1)
-            A = args[0]
-            B = args[1]
-            print('A ', A)
-            print('B ', B)
-            ########################################################################     
+        ##################################################     
             pred = A *  Xarr + B   
         rmse = self._RMSE(pred, yarr)
         ########################################################################
@@ -299,7 +283,7 @@ class ParseTreeFolder():
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-lag-1
-        start = np.arange(window, Xmax, lag)
+        start = np.arange(window, Xend-window, lag)
         print('start', start)
         ########################################################################
         # print('xmax', Xmax)
@@ -347,7 +331,7 @@ class ParseTreeFolder():
                 score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
                         for s in start]
             except:
-                raise Exception 'Failed to fit Exponential curve'
+                raise Exception('Failed to fit Exponential curve')
                         
         ########################################################################
         print('score', score)
@@ -384,7 +368,7 @@ class ParseTreeFolder():
         Yexp=np.array(Yexp)
         Xl=np.array(Xl)  
         Xe=np.array(Xe) 
-        idx = self._dcross(Ylin, Yexp)
+        idx = self._dcross(Ylin[::-1], Yexp)
         Xidx=Xe[idx]    
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
@@ -395,8 +379,8 @@ class ParseTreeFolder():
 
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
-        ax1.set_ylabel(self.sample, color=color)
-        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='o', label = 'data')
+        ax1.set_ylabel(self.sample)
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
         color = 'tab:red'
         ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')
         ax1.tick_params(axis='y', labelcolor=color)
@@ -404,32 +388,24 @@ class ParseTreeFolder():
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 
         color = 'tab:green'
-        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-        ax2.plot(Xl, Ylin, color=color, marker='o', label = 'RMSE lin')
+        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+        ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
         ax2.tick_params(axis='y', labelcolor=color)
         color = 'tab:orange'
-        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-        ax2.plot(Xe, Yexp, color=color, marker='o', label = 'RMSE exp')
+        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+        ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
         ax2.tick_params(axis='y', labelcolor=color)
         plt.legend()
-        for i in np.arange(0,len(idx)):
-            ax2.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'black')
+        # for i in np.arange(0,len(idx)):
+        #     ax2.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'black')
+        # 
+        plt.plot(Xidx, Yidx, 'ro')
         fig.tight_layout()
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
         # input()
         plt.close()   
 
-
-
-        # plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'data')
-        # plt.plot(X, Ylin, linestyle='-', marker='o', label = 'RMSE lin')
-        # plt.plot(X, Yexp, linestyle='-', marker='o', label = 'RMSE exp')
-        # plt.legend()
-        # for i in np.arange(0,len(idx)):
-        #     plt.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'red')
-        # plt.show()     
-        
         print('\nInterval method')
         for i in np.arange(0,len(idx)):
             print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
@@ -445,10 +421,14 @@ class ParseTreeFolder():
         ########################################################################
         print('gs',self.global_score)        
         ########################################################################
+        # if what_to_do=='2':
+        #     self.global_score.append([self.sample,'Discarded', 'Discarded'])
+        # if what_to_do=='1':
+        #     self.global_score.append([self.sample, Xidx, Xidx_int])
         if what_to_do=='2':
-            self.global_score.append([self.sample,'Discarded', 'Discarded'])
+            self.global_score.append([self.sample,'Discarded'])
         if what_to_do=='1':
-            self.global_score.append([self.sample, Xidx, Xidx_int])
+            self.global_score.append([self.sample, Xidx])
         ########################################################################
         # print('score',[self.sample,Xidx_int[0], Xidx_int[1]])
         print('gs',self.global_score)
@@ -479,10 +459,7 @@ class ParseTreeFolder():
         ########################################################################
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
-
-        score_l = (score_l - np.mean(score_l)) / np.std(score_l)
-        score_e = (score_e - np.mean(score_e)) / np.std(score_e)
-
+  
         idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l, mean_start_e)
 
 
@@ -509,8 +486,8 @@ class ParseTreeFolder():
             print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
-            plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
-            plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
+            plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+            plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
             plt.legend()    
             # plt.pause(PAUSE_GRAPH/10)
             plt.waitforbuttonpress(0)
@@ -550,8 +527,8 @@ class ParseTreeFolder():
                             print("Oops!  That was no valid number.  Try again...")
 
                     self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P2, delta_multi = DELTA_MULTI2)
-                    plt.plot(self.Xselected, self.yselected, linestyle='-', marker='o', label = 'raw data')
-                    plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='o', label = 'smooth')
+                    plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+                    plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
                     plt.legend()    
                     # plt.pause(PAUSE_GRAPH/10)
                     plt.waitforbuttonpress(0)
