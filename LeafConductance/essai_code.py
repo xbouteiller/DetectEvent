@@ -296,7 +296,7 @@ class ParseTreeFolder():
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xend = np.shape(X)[0]
-        Xmax = np.shape(X)[0]-window+1
+        Xmax = np.shape(X)[0]-lag-1
         start = np.arange(0, Xmax, lag)
         ########################################################################
         # print('xmax', Xmax)
@@ -326,7 +326,7 @@ class ParseTreeFolder():
                 print('bound', bound)
                 ########################################################################
             else:
-                
+
                 b=BOUND
             essai_exp = 0
             while essai_exp == 0:
