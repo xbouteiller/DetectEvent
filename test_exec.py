@@ -11,6 +11,6 @@ if __name__=="__main__":
 
     parse_folder = ParseTreeFolder()
     parse_folder.parse_folder()
-    parse_folder.change_detection()
-
+    # parse_folder.change_detection()
+    parse_folder.run()
 

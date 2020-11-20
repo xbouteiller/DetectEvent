@@ -484,7 +484,7 @@ class ParseTreeFolder():
 
     def _robust_import(self, elem):
         if self.file_or_folder== '1':
-                        skip=1
+            skip=1
         else:
             skip=0
         try:
@@ -502,6 +502,7 @@ class ParseTreeFolder():
                     dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
         return dffile
         
+
     def change_detection(self):
         print('change_detection\n')
 
@@ -515,31 +516,11 @@ class ParseTreeFolder():
                 self.presentfile=self.listOfFiles[d][0]
             except:
                 self.presentfile = 'No file'
+            
             print('parsing list of files from : {}'.format(self.presentfile))
-
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)
-
-                    # if self.file_or_folder== '1':
-                    #     skip=1
-                    # else:
-                    #     skip=0
-                    # try:
-                    #     dffile = ParseFile(path = elem, skipr=skip).clean_file()
-                    # except:
-                    #     encodi='latin'
-                    #     dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
-
-                    # if dffile.shape[1] == 1:
-                    #     separ=';'
-                    #     try:
-                    #         dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
-                    #     except:
-                    #         encodi='latin'
-                    #         dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
-
-
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
                     pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Wind_of_Change']).to_csv('global_score.csv')
 
