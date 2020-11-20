@@ -6,7 +6,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, RationalQuadratic, ExpSineSquared
 from loess.loess_1d import loess_1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-# from tvregdiff import TVRegDiff
+from LeafConductance.tvregdiff import log_iteration, TVRegDiff 
 import pandas as pd
 from scipy.optimize import curve_fit
 import time
@@ -67,14 +67,6 @@ class ParseFile():
         import pandas as pd
         import numpy as np
 
-        # #drop full na
-        # self.file = self.file.dropna(axis = 0, how = 'all')
-
-        # # convert to numeric if possible
-        # self.file = self.file.apply(lambda x: pd.to_numeric(x, errors ="ignore"))
-
-        # # lower strings
-        # self.file = self.file.applymap(lambda s:s.lower() if (isinstance(s, str) and s!='None')  else s)
 
         return self.file
 
@@ -249,8 +241,6 @@ class ParseTreeFolder():
             self.run()
 
 
- 
-
     def _min_max(self, X): 
         X_scaled = (X-np.min(X)) / (np.max(X) -  np.min(X))
         return X_scaled
@@ -268,52 +258,24 @@ class ParseTreeFolder():
         if mode == 'exp':
             Xarr = np.array(X).reshape(-1)
             yarr = np.array(y).reshape(-1)
-            print(args[0])
-            #input()
             reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
             A, B = reg     
             pred = A * np.exp(-B * Xarr)
-        ##################################################     
-            #pred = A *  Xarr + B   
         rmse = self._RMSE(pred, yarr)
-        ########################################################################
-        print('rmse', rmse)
-        ########################################################################
         return rmse
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
         Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-lag-1
         start = np.arange(window, Xend-window, lag)
-        print('start', start)
-        ########################################################################
-        # print('xmax', Xmax)
-        # print('start' , start)
-        # print('Xend', Xend)
-        # print([X[s] \
-        #             for s in start])
-
-        # print(self._fit_and_pred(X[0:10], y[0:10], 'linear'))  
-        # input()
-        ########################################################################
 
         if mode == 'linear':
-            # mean_start = X[[int(s + window/2) for s in start]]
-            # mean_start = X[[int(np.floor((Xend-s+ Xend)/2)) for s in start]]
             mean_start = X[[int(Xend-s) for s in start]]
-            # print('lin idx', [int(np.floor((Xend-s+ Xend)/2)) for s in start])
-            # print('mean start LIN',mean_start)
-            # input()
             score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
                     for s in start]    #[::-1]
         
         if mode == 'exp':
-            # mean_start = X[[int(s + window/2) for s in start]]
-            # mean_start = X[[int(np.floor(s/2)) for s in start]]
             mean_start = X[start]
-            # print('exp idx', [int(np.floor(s/2)) for s in start])
-            # print('mean start EXP',mean_start)
-            # input()
             if BOUND == 'NotSet':
                 try:
                     reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
@@ -322,9 +284,6 @@ class ParseTreeFolder():
                     bound = ([Aa-0.5*Aa,Bb/100],[Aa+0.5*Aa, Bb*100])
                 except:
                     bound = ([0,1/1000000],[100, 1/100])
-                ########################################################################
-                print('bound', bound)
-                ########################################################################
             else:
                 bound=BOUND
 
@@ -333,10 +292,6 @@ class ParseTreeFolder():
                         for s in start]
             except:
                 raise Exception('Failed to fit Exponential curve')
-                        
-        ########################################################################
-        #print('{} score'.format(mode), score)
-        ########################################################################
 
         score = self._min_max(score)
         print('{} score'.format(mode), score)
@@ -354,11 +309,6 @@ class ParseTreeFolder():
         yarr = np.array(y).reshape(-1)
         if mode == 'exp':
             reg = curve_fit(self._func, Xarr, yarr)[0]
-        # if mode == 'linear':
-        #     reg = curve_fit(self._func_lin, Xarr, yarr)[0]
-        ########################################################################
-        print('detected ',reg)
-        ########################################################################
         return reg
 
     def _dcross(self, Yl, Ye):
@@ -374,7 +324,7 @@ class ParseTreeFolder():
         Xidx=Xe[idx]    
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
-        #Yidx=Yexp[idx]
+
         Yidx=self.Ysmooth[self.Xselected == Xidx]
 
 
@@ -420,25 +370,15 @@ class ParseTreeFolder():
             3. Select value manually on graph (WORK IN PROGRESS)
             ''')
         what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-        ########################################################################
-        print('gs',self.global_score)        
-        ########################################################################
-        # if what_to_do=='2':
-        #     self.global_score.append([self.sample,'Discarded', 'Discarded'])
-        # if what_to_do=='1':
-        #     self.global_score.append([self.sample, Xidx, Xidx_int])
+
         if what_to_do=='2':
             self.global_score.append([self.sample,'Discarded'])
         if what_to_do=='1':
             self.global_score.append([self.sample, Xidx])
-        ########################################################################
-        # print('score',[self.sample,Xidx_int[0], Xidx_int[1]])
+
         print('gs',self.global_score)
-        # input()
-        ########################################################################
+
         return idx, Xidx, Xidx_int 
-
-
     
     def _change_det(self, df):
 
@@ -450,21 +390,11 @@ class ParseTreeFolder():
             _lag = int(df.shape[0]/LAG_DIV)
         _X = df['delta_time'].copy().values
         _y = df[YVAR].copy().values
-        ########################################################################
-        print('head', df.head())
-        print('sample', df[SAMPLE_ID].unique())
-        print('wind : ', _wind)
-        print('lag : ',_lag)
-        print('x : ',_X[0:5])
-        print('y : ',_y[0:5])
-        # input()
-        ########################################################################
+
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
   
         idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
-
-
 
     def _smoother(self, ex, end, fr, delta_multi):
         delt = delta_multi * ex.shape[0]
@@ -548,20 +478,30 @@ class ParseTreeFolder():
                     if what_to_do == '2':
                         pass
                 df[YVAR] = self.Ysmooth.copy()
-            if what_to_do=='3':
-                pass
-            ########################################################################
-            print('head', df.head())
-            print('sample', df[SAMPLE_ID].unique()) 
-
-            print('Xsel',self.Xselected)
-            print('ysel',self.yselected)
-            #input()
-            ########################################################################      
+    
             FUNC(df)
          
 
+    def _robust_import(self, elem):
+        if self.file_or_folder== '1':
+                        skip=1
+        else:
+            skip=0
+        try:
+            dffile = ParseFile(path = elem, skipr=skip).clean_file()
+        except:
+            encodi='latin'
+            dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
 
+            if dffile.shape[1] == 1:
+                separ=';'
+                try:
+                    dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
+                except:
+                    encodi='latin'
+                    dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+        return dffile
+        
     def change_detection(self):
         print('change_detection\n')
 
@@ -579,28 +519,29 @@ class ParseTreeFolder():
 
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
-                    # print(elem)
-                    if self.file_or_folder== '1':
-                        skip=1
-                    else:
-                        skip=0
-                    try:
-                        dffile = ParseFile(path = elem, skipr=skip).clean_file()
-                    except:
-                        encodi='latin'
-                        dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
+                    dffile = self._robust_import(elem)
 
-                    if dffile.shape[1] == 1:
-                        separ=';'
-                        try:
-                            dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
-                        except:
-                            encodi='latin'
-                            dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+                    # if self.file_or_folder== '1':
+                    #     skip=1
+                    # else:
+                    #     skip=0
+                    # try:
+                    #     dffile = ParseFile(path = elem, skipr=skip).clean_file()
+                    # except:
+                    #     encodi='latin'
+                    #     dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
 
-                    # self._parse_samples2(dffile=dffile)
+                    # if dffile.shape[1] == 1:
+                    #     separ=';'
+                    #     try:
+                    #         dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
+                    #     except:
+                    #         encodi='latin'
+                    #         dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+
+
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
-                    pd.DataFrame(self.global_score).to_csv('global_score.csv')
+                    pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Wind_of_Change']).to_csv('global_score.csv')
 
 
 
