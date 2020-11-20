@@ -33,7 +33,7 @@ LAG_DIV = WIND_DIV * 45
 BOUND = 'NotSet'
 FRAC_P = 0.1
 DELTA_MULTI = 0.01
-PAUSE_GRAPH = 3
+PAUSE_GRAPH = 8
 
 class ParseFile():
     import pandas as pd
@@ -274,7 +274,7 @@ class ParseTreeFolder():
             A, B = reg     
             pred = A * np.exp(-B * Xarr)
         ##################################################     
-            pred = A *  Xarr + B   
+            #pred = A *  Xarr + B   
         rmse = self._RMSE(pred, yarr)
         ########################################################################
         print('rmse', rmse)
@@ -318,7 +318,7 @@ class ParseTreeFolder():
                 try:
                     reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
                     Aa, Bb = reg 
-                    bound = ([Aa-0.1*Aa,Bb/10],[Aa+0.1*Aa, Bb*10])
+                    #bound = ([Aa-0.1*Aa,Bb/10],[Aa+0.1*Aa, Bb*10]) # TO DO CHECK IF IT IS CORRECT
                     bound = ([Aa-0.5*Aa,Bb/100],[Aa+0.5*Aa, Bb*100])
                 except:
                     bound = ([0,1/1000000],[100, 1/100])
@@ -374,34 +374,34 @@ class ParseTreeFolder():
         Xidx=Xe[idx]    
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
-        Yidx=Yexp[idx]
+        #Yidx=Yexp[idx]
+        Yidx=self.Ysmooth[self.Xselected == Xidx]
 
 
         fig, ax1 = plt.subplots()
 
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
-        ax1.set_ylabel(self.sample)
+        ax1.set_ylabel(self.sample, color=color)
         ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
-        color = 'tab:red'
-        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')
         ax1.tick_params(axis='y', labelcolor=color)
+        color = 'tab:red'
+        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+        ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+        ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+        ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+        ax1.legend()
 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-
         color = 'tab:green'
         ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
         ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
-        ax2.tick_params(axis='y', labelcolor=color)
+        #ax2.tick_params(axis='y', labelcolor=color)
         color = 'tab:orange'
-        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
         ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
         ax2.tick_params(axis='y', labelcolor=color)
-        plt.legend()
-        # for i in np.arange(0,len(idx)):
-        #     ax2.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'black')
-        # 
-        plt.plot(Xidx, Yidx, 'ro')
+        ax2.legend()
         fig.tight_layout()
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
@@ -600,6 +600,7 @@ class ParseTreeFolder():
 
                     # self._parse_samples2(dffile=dffile)
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
+                    pd.DataFrame(self.global_score).to_csv('global_score.csv')
 
 
 
