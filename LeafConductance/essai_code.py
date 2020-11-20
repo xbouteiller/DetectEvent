@@ -10,6 +10,7 @@ from LeafConductance.tvregdiff import log_iteration, TVRegDiff
 import pandas as pd
 from scipy.optimize import curve_fit
 import time
+import sys
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
@@ -34,6 +35,11 @@ BOUND = 'NotSet'
 FRAC_P = 0.1
 DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
+
+ITERN=20 
+ALPH=10
+EP=1e-9
+
 
 class ParseFile():
     import pandas as pd
@@ -122,9 +128,9 @@ class ParseTreeFolder():
 
 
         self.choices = {
-        "1": self.change_detection#,
-        # "2": self.compute_conductance,
-        # "3": self.extract_strings,
+        "1": self.change_detection,
+        "2": self.robust_differential,
+        "3": self._quit,
         # "4": self.erase,
         # "5": self.extract_strings_and_nums
         }
@@ -226,19 +232,28 @@ class ParseTreeFolder():
 
         1. Detect changes in curve (RMSE approach)
         2. Compute conductance (robust differential approach)
+        3. Exit
         """)
+
+    def _quit(self):
+        print("Thank you for using your LeafConductance today.")
+        sys.exit(0)
 
     def run(self):
         '''Display the menu and respond to choices.'''
+        
+        while True:
+            self.display_menu()
+            choice = input("Enter an option: ")
 
-        self.display_menu()
-        choice = input("Enter an option: ")
-        action = self.choices.get(choice)
-        if action:
-            action()
-        else:
-            print("{0} is not a valid choice".format(choice))
-            self.run()
+            
+            action = self.choices.get(choice)
+
+            if action:
+                action()
+            else:
+                print("{0} is not a valid choice".format(choice))
+                self.run()
 
 
     def _min_max(self, X): 
@@ -294,7 +309,7 @@ class ParseTreeFolder():
                 raise Exception('Failed to fit Exponential curve')
 
         score = self._min_max(score)
-        print('{} score'.format(mode), score)
+        #print('{} score'.format(mode), score)
         return score, mean_start
 
 
@@ -525,6 +540,72 @@ class ParseTreeFolder():
                     pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Wind_of_Change']).to_csv('global_score.csv')
 
 
+        
+        
+    def _plot_tvregdiff(self, _X, _y):
+        
+        fig, ax1 = plt.subplots()
+        color = 'tab:blue'
+        ax1.set_xlabel('time (min)')
+        ax1.set_ylabel(self.sample, color=color)
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
+        ax1.tick_params(axis='y', labelcolor=color)
+        color = 'tab:red'
+        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+        ax1.legend()
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+        color = 'tab:green'       
+        color = 'tab:green'
+        ax2.set_ylabel('Robust differential', color=color)  # we already handled the x-label with ax1
+        ax2.plot(_X, _y, color=color, marker='.', label = 'Robust differential')
+        ax2.tick_params(axis='y', labelcolor=color)
+        ax2.legend()
+        fig.tight_layout()
+        # plt.pause(PAUSE_GRAPH)
+        plt.waitforbuttonpress(0)
+        # input()
+        plt.close()   
+    
+    
+    def _tvregdiff(self,df):
+
+        _X = df['delta_time'].copy().values
+        _y = df[YVAR].copy().values
+
+        dX = _X[1] - _X[0]
+
+        dYdX = TVRegDiff(data=_y ,itern=ITERN, 
+                        alph=ALPH, dx=dX, 
+                        ep=EP,
+                        scale='small' ,
+                        plotflag=False, 
+                        precondflag=False,
+                        diffkernel='abs',
+                        cgtol = 1e-4)
+        self._plot_tvregdiff(_X=_X, _y=dYdX)
+        
+        return dYdX
+
+    def robust_differential(self):    
+        dimfolder = len(self.listOfFiles)
+        li_all = []
+        for d in np.arange(0,dimfolder):
+            print('\n\n\n---------------------------------------------------------------------')
+            print(d)
+            li = []
+            try:
+                self.presentfile=self.listOfFiles[d][0]
+            except:
+                self.presentfile = 'No file'
+            
+            print('parsing list of files from : {}'.format(self.presentfile))
+            if self.presentfile != 'No file':
+                for elem in self.listOfFiles[d]:
+                    dffile = self._robust_import(elem)
+                    self._parse_samples(dffile = dffile, FUNC = self._tvregdiff)
+                    
 
   
 
