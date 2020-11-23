@@ -11,6 +11,7 @@ import pandas as pd
 from scipy.optimize import curve_fit
 import time
 import sys
+from scipy.signal import find_peaks
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
@@ -19,7 +20,7 @@ print('---------------                                    ---------------------'
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
 
-num_col = ['weight_g','T_C','RH', 'Patm']
+num_col = ['weight_g','T_C','RH', 'Patm', 'Area_m2']
 group_col=['campaign', 'sample_ID', 'Treatment', 'Operator']
 date=['date_time']
 
@@ -29,6 +30,11 @@ SEP = ','
 TIME_COL = 'date_time'
 SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
+T = 'T_C'
+RH = 'RH'
+PATM = 'Patm'
+AREA = 'Area_m2'
+
 WIND_DIV = 8
 LAG_DIV = WIND_DIV * 45
 BOUND = 'NotSet'
@@ -37,7 +43,7 @@ DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
 
 ITERN=20 
-ALPH=10
+ALPH=10000
 EP=1e-9
 
 
@@ -348,7 +354,7 @@ class ParseTreeFolder():
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
         ax1.set_ylabel(self.sample, color=color)
-        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
         ax1.tick_params(axis='y', labelcolor=color)
         color = 'tab:red'
         ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
@@ -395,7 +401,7 @@ class ParseTreeFolder():
 
         return idx, Xidx, Xidx_int 
     
-    def _change_det(self, df):
+    def _change_det(self, df, COL_Y='standard'):
 
         if df.shape[0] < 100:
             _wind = int(df.shape[0]/6)
@@ -404,7 +410,11 @@ class ParseTreeFolder():
             _wind = int(df.shape[0]/WIND_DIV)
             _lag = int(df.shape[0]/LAG_DIV)
         _X = df['delta_time'].copy().values
-        _y = df[YVAR].copy().values
+        if COL_Y == 'standard':
+            _y = df[YVAR].copy().values
+        else:
+             _y = df[COL_Y].copy().values
+
 
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
@@ -542,26 +552,42 @@ class ParseTreeFolder():
 
         
         
-    def _plot_tvregdiff(self, _X, _y):
+    def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' ):
         
         fig, ax1 = plt.subplots()
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
-        ax1.set_ylabel(self.sample, color=color)
+        ax1.set_ylabel(self.sample + '\nWeight (g)', color=color)
         ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
         ax1.tick_params(axis='y', labelcolor=color)
         color = 'tab:red'
         ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
-        ax1.legend()
+        
 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 
         color = 'tab:green'       
-        color = 'tab:green'
-        ax2.set_ylabel('Robust differential', color=color)  # we already handled the x-label with ax1
-        ax2.plot(_X, _y, color=color, marker='.', label = 'Robust differential')
+        
+        ax2.set_ylabel(ax2_Y, color=color)  # we already handled the x-label with ax1
+        ax2.plot(_X, _y, color=color, marker='.', label = ax2_label)
         ax2.tick_params(axis='y', labelcolor=color)
-        ax2.legend()
+        
+        #ax2.plot(_X[peaks], _y[peaks], "x", markersize=10, mew=4, c = 'red')
+
+        ax3 = ax1.twinx()
+        color = 'tab:orange'
+        ax3.plot(_X, _y2, color=color, marker='.', label = 'second derivative ' + ax2_label)
+        ax3.tick_params(axis='y', labelcolor=color, 
+                        which='both',      # both major and minor ticks are affected
+                        bottom=False,      # ticks along the bottom edge are off
+                        top=False,         # ticks along the top edge are off
+                        labelbottom=False)        
+        ax3.plot(_X[peaks], _y2[peaks], "x", markersize=10, mew=4, color = 'red', label = 'Peak')
+        ax3.vlines(ymin=np.min(_y2),ymax = np.max(_y2),x=_X[peaks], color='red', lw=0.8, linestyle='--')
+        ax3.axis('off')
+        ax1.legend(loc='upper left')
+        ax2.legend(loc='upper right')
+        ax3.legend(loc='right')
         fig.tight_layout()
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
@@ -583,10 +609,58 @@ class ParseTreeFolder():
                         plotflag=False, 
                         precondflag=False,
                         diffkernel='abs',
-                        cgtol = 1e-4)
-        self._plot_tvregdiff(_X=_X, _y=dYdX)
+                        cgtol = 1e-5)
         
-        return dYdX
+        #Conversion de la pente (en g/jour) en mmol/s
+        k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+
+        #Calcul VPD en kpa (Patm = 101.325 kPa)
+        VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
+
+        #calcul gmin mmol.s
+        gmin_ = -k * df[PATM].values/VPD
+
+        #calcul gmin en mmol.m-2.s-1
+        gmin = gmin_ / df[AREA].values
+        df['gmin'] = gmin
+        
+        if len(dYdX)<200:
+            DIV_ALPH = 1000
+            DIST = 10
+            PROM = 10
+        else:
+            DIV_ALPH = 10
+            DIST = 200
+            PROM = 4
+        
+        dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+                        alph=ALPH/DIV_ALPH, dx=dX, 
+                        ep=EP,
+                        scale='small' ,
+                        plotflag=False, 
+                        precondflag=False,
+                        diffkernel='abs',
+                        cgtol = 1e-5)
+        ddGmin = TVRegDiff(data=dGmin,itern=ITERN, 
+                        alph=ALPH/DIV_ALPH, dx=dX, 
+                        ep=EP,
+                        scale='small' ,
+                        plotflag=False, 
+                        precondflag=False,
+                        diffkernel='abs',
+                        cgtol = 1e-5)
+
+        #ddGmin = np.diff(gmin,2)
+        peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+
+        #peaks = peaks + 
+        self._plot_tvregdiff(_X=_X, _y=gmin, _y2 = ddGmin, peaks=peaks)   
+        
+        #self._plot_tvregdiff(_X=_X, _y=ddGmin, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-3})$', ax2_label = 'double diff Gmin') 
+        
+        # self._change_det(df, COL_Y='gmin')
+
+        return gmin
 
     def robust_differential(self):    
         dimfolder = len(self.listOfFiles)
