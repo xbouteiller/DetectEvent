@@ -505,6 +505,7 @@ class ParseTreeFolder():
                 df[YVAR] = self.Ysmooth.copy()
     
             FUNC(df)
+            #return dfe
          
 
     def _robust_import(self, elem):
@@ -576,7 +577,7 @@ class ParseTreeFolder():
 
         ax3 = ax1.twinx()
         color = 'tab:orange'
-        ax3.plot(_X, _y2, color=color, marker='.', label = 'second derivative ' + ax2_label)
+        ax3.plot(_X, _y2, color=color, marker='.', label = 'first order derivative ' + ax2_label)
         ax3.tick_params(axis='y', labelcolor=color, 
                         which='both',      # both major and minor ticks are affected
                         bottom=False,      # ticks along the bottom edge are off
@@ -602,8 +603,21 @@ class ParseTreeFolder():
 
         dX = _X[1] - _X[0]
 
+
+        if len(_X)<200:   # MAYBE HYPERPARAMETERS CAN BE DEFINED OTHERLY
+            DIV_ALPH = 100000 # 1000
+            DIV_ALPH2 = 100 # 1000
+            DIST = 10
+            PROM = 20 #10
+        else:
+            DIV_ALPH = 1 #10
+            DIV_ALPH2= 100
+            DIST = 100 #200
+            PROM = 4#4
+        
+
         dYdX = TVRegDiff(data=_y ,itern=ITERN, 
-                        alph=ALPH, dx=dX, 
+                        alph=ALPH/DIV_ALPH, dx=dX, 
                         ep=EP,
                         scale='small' ,
                         plotflag=False, 
@@ -622,49 +636,59 @@ class ParseTreeFolder():
 
         #calcul gmin en mmol.m-2.s-1
         gmin = gmin_ / df[AREA].values
-        df['gmin'] = gmin
+        df['raw_slope'] = dYdX
+        #df['gmin'] = gmin
         
-        if len(dYdX)<200:
-            DIV_ALPH = 1000
-            DIST = 10
-            PROM = 10
-        else:
-            DIV_ALPH = 10
-            DIST = 200
-            PROM = 4
-        
+      
         dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
-                        alph=ALPH/DIV_ALPH, dx=dX, 
+                        alph=ALPH/DIV_ALPH2, dx=dX, 
                         ep=EP,
                         scale='small' ,
                         plotflag=False, 
                         precondflag=False,
                         diffkernel='abs',
                         cgtol = 1e-5)
-        ddGmin = TVRegDiff(data=dGmin,itern=ITERN, 
-                        alph=ALPH/DIV_ALPH, dx=dX, 
-                        ep=EP,
-                        scale='small' ,
-                        plotflag=False, 
-                        precondflag=False,
-                        diffkernel='abs',
-                        cgtol = 1e-5)
+        # do we really need a second order derivative ?
+        # ddGmin = TVRegDiff(data=dGmin,itern=ITERN, 
+        #                 alph=ALPH/DIV_ALPH2, dx=dX, 
+        #                 ep=EP,
+        #                 scale='small' ,
+        #                 plotflag=False, 
+        #                 precondflag=False,
+        #                 diffkernel='abs',
+        #                 cgtol = 1e-5)
 
-        #ddGmin = np.diff(gmin,2)
+
+        ddGmin = dGmin
+        #ddGmin = np.diff(gmin,1)
         peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        peaks = np.concatenate((peaks, peaks2), axis=None)
+        #print('peaks ',peaks)
 
+        df['d_gmin'] = ddGmin
+        #print(df)
+        if len(peaks)>0:
+            df['Peaks'] = np.array_str(_X[peaks])
+        else:
+            df['Peaks'] = 'NoPeak'
         #peaks = peaks + 
         self._plot_tvregdiff(_X=_X, _y=gmin, _y2 = ddGmin, peaks=peaks)   
         
+        self.df_save.columns = df.columns
+        self.df_save = pd.concat([self.df_save, df], axis = 0, ignore_index = True)
+        
+
         #self._plot_tvregdiff(_X=_X, _y=ddGmin, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-3})$', ax2_label = 'double diff Gmin') 
         
         # self._change_det(df, COL_Y='gmin')
 
-        return gmin
+        return df
 
     def robust_differential(self):    
         dimfolder = len(self.listOfFiles)
         li_all = []
+        self.df_save = pd.DataFrame(columns = range(0,15))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
@@ -679,7 +703,12 @@ class ParseTreeFolder():
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)
                     self._parse_samples(dffile = dffile, FUNC = self._tvregdiff)
-                    
+        
+        self.df_save.to_csv('gmin.csv')
+                    #dfe = 
+                    # df_save.columns = dfe.columns
+                    # df_save = pd.concat([df_save, dfe], axis = 0, ignore_index = True)
+                    # df_save.to_csv('gmin.csv')
 
   
 
