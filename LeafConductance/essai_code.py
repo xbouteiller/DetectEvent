@@ -102,6 +102,7 @@ class ParseTreeFolder():
         from tkinter.filedialog import askopenfilename, askdirectory
 
         self.global_score = []
+        self.Conductance = False
 
         print('''
         WELCOME TO LEAFCONDUCTANCE
@@ -361,7 +362,7 @@ class ParseTreeFolder():
         ax1.plot(Xidx, Yidx, 'ro', markersize=8)
         ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
         ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
-        ax1.legend()
+        ax1.legend(loc='upper right')
 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
         color = 'tab:green'
@@ -372,7 +373,7 @@ class ParseTreeFolder():
         ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
         ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
         ax2.tick_params(axis='y', labelcolor=color)
-        ax2.legend()
+        ax2.legend(loc='right')
         fig.tight_layout()
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
@@ -443,67 +444,70 @@ class ParseTreeFolder():
             print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
-            plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
-            plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
-            plt.legend()    
-            # plt.pause(PAUSE_GRAPH/10)
-            plt.waitforbuttonpress(0)
-            # input()
-            plt.close()   
-            print('''
-            Do you want to work on smoothed data ?
+            if not self.Conductance:  
+                plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+                plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
+                plt.legend()    
+                # plt.pause(PAUSE_GRAPH/10)
+                plt.waitforbuttonpress(0)
+                # input()
+                plt.close() 
 
-            1: Yes
-            2: Yes, But I want to adjust smoothing parameters
-            3: No            
-            ''') 
+            
+                print('''
+                Do you want to work on smoothed data ?
 
-            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
-            ########################################################################
-            if what_to_do=='1':
-                df[YVAR] = self.Ysmooth.copy()
-            if what_to_do=='2':
-                while True:          
-                    while True:
-                        
-                        try:
-                            _FRAC=0.1
-                            FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)))
-                            _FRAC = FRAC_P2
+                1: Yes
+                2: Yes, But I want to adjust smoothing parameters
+                3: No            
+                ''') 
+
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
+                ########################################################################
+                if what_to_do=='1':
+                    df[YVAR] = self.Ysmooth.copy()
+                if what_to_do=='2':
+                    while True:          
+                        while True:
+                            
+                            try:
+                                _FRAC=0.1
+                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)))
+                                _FRAC = FRAC_P2
+                                break
+                            except ValueError:
+                                print("Oops!  That was no valid number.  Try again...")                    
+                        while True:
+
+                            try:
+                                _DELTA_MULTI=0.01
+                                DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)))
+                                _DELTA_MULTI = DELTA_MULTI2
+                                break
+                            except ValueError:
+                                print("Oops!  That was no valid number.  Try again...")
+
+                        self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P2, delta_multi = DELTA_MULTI2)
+                        plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+                        plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
+                        plt.legend()    
+                        # plt.pause(PAUSE_GRAPH/10)
+                        plt.waitforbuttonpress(0)
+                        # input()
+                        plt.close()   
+                        print('''
+                        Do you want to keep this values?
+
+                        1: Yes
+                        2: No            
+                        ''')
+                        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+                        if what_to_do == '1':
                             break
-                        except ValueError:
-                            print("Oops!  That was no valid number.  Try again...")                    
-                    while True:
-
-                        try:
-                            _DELTA_MULTI=0.01
-                            DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)))
-                            _DELTA_MULTI = DELTA_MULTI2
-                            break
-                        except ValueError:
-                            print("Oops!  That was no valid number.  Try again...")
-
-                    self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P2, delta_multi = DELTA_MULTI2)
-                    plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
-                    plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
-                    plt.legend()    
-                    # plt.pause(PAUSE_GRAPH/10)
-                    plt.waitforbuttonpress(0)
-                    # input()
-                    plt.close()   
-                    print('''
-                    Do you want to keep this values?
-
-                    1: Yes
-                    2: No            
-                    ''')
-                    what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-                    if what_to_do == '1':
-                        break
-                    if what_to_do == '2':
-                        pass
-                df[YVAR] = self.Ysmooth.copy()
-    
+                        if what_to_do == '2':
+                            pass
+                    df[YVAR] = self.Ysmooth.copy()
+        
             FUNC(df)
             #return dfe
          
@@ -602,16 +606,19 @@ class ParseTreeFolder():
         _y = df[YVAR].copy().values
 
         dX = _X[1] - _X[0]
-
+        if len(_X)<1000:
+            SCALE = 'small'
+        else:
+            SCALE = 'large'
 
         if len(_X)<200:   # MAYBE HYPERPARAMETERS CAN BE DEFINED OTHERLY
-            DIV_ALPH = 100000 # 1000
-            DIV_ALPH2 = 100 # 1000
+            DIV_ALPH = 1000 # 1000
+            DIV_ALPH2 = 1000 # 1000
             DIST = 10
             PROM = 20 #10
         else:
             DIV_ALPH = 1 #10
-            DIV_ALPH2= 100
+            DIV_ALPH2= 10
             DIST = 100 #200
             PROM = 4#4
         
@@ -619,11 +626,12 @@ class ParseTreeFolder():
         dYdX = TVRegDiff(data=_y ,itern=ITERN, 
                         alph=ALPH/DIV_ALPH, dx=dX, 
                         ep=EP,
-                        scale='small' ,
+                        scale=SCALE ,
                         plotflag=False, 
                         precondflag=False,
                         diffkernel='abs',
-                        cgtol = 1e-5)
+                        cgtol = 1e-5)    
+
         
         #Conversion de la pente (en g/jour) en mmol/s
         k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
@@ -636,14 +644,13 @@ class ParseTreeFolder():
 
         #calcul gmin en mmol.m-2.s-1
         gmin = gmin_ / df[AREA].values
-        df['raw_slope'] = dYdX
-        #df['gmin'] = gmin
         
-      
+        #df['gmin'] = gmin
+             
         dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
                         alph=ALPH/DIV_ALPH2, dx=dX, 
                         ep=EP,
-                        scale='small' ,
+                        scale=SCALE ,
                         plotflag=False, 
                         precondflag=False,
                         diffkernel='abs',
@@ -658,37 +665,131 @@ class ParseTreeFolder():
         #                 diffkernel='abs',
         #                 cgtol = 1e-5)
 
-
         ddGmin = dGmin
         #ddGmin = np.diff(gmin,1)
+        
         peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
         peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
         peaks = np.concatenate((peaks, peaks2), axis=None)
         #print('peaks ',peaks)
 
-        df['d_gmin'] = ddGmin
+        self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+
+        
+        #####################################################################################"
+        # 
+        #  
+        print('''
+            Do you want to work on keep this parameters for conductance computation ?
+
+            1: Yes
+            2: No, I want to adjust parameters
+                    
+            ''') 
+
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+        ########################################################################
+        if what_to_do=='1':
+            pass
+        if what_to_do=='2':
+            _ALPH = ALPH/DIV_ALPH
+            _ALPH2=ALPH/DIV_ALPH2
+            _EP=EP
+            while True:          
+                while True:                        
+                    try:
+                        
+                        _ALPH = float(input('What is the value for alpha? (current value : {}) '.format(_ALPH)) or _ALPH)
+                        #_FRAC = FRAC_P2
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")                    
+                while True:
+                    try:
+                       
+                        _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
+                        #_DELTA_MULTI = DELTA_MULTI2
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+                while True:
+                    try:
+                        
+                        _EP= float(input('What is the value for epsilon ? (current value : {}) '.format(_EP))or _EP)
+                        #_DELTA_MULTI = DELTA_MULTI2
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+
+                dYdX = TVRegDiff(data=_y ,itern=ITERN, 
+                    alph=_ALPH, dx=dX, 
+                    ep=_EP,
+                    scale=SCALE ,
+                    plotflag=False, 
+                    precondflag=False,
+                    diffkernel='abs',
+                    cgtol = 1e-5)    
+
+    
+                #Conversion de la pente (en g/jour) en mmol/s
+                k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+                #Calcul VPD en kpa (Patm = 101.325 kPa)
+                VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
+                #calcul gmin mmol.s
+                gmin_ = -k * df[PATM].values/VPD
+                #calcul gmin en mmol.m-2.s-1
+                gmin = gmin_ / df[AREA].values
+                df['raw_slope'] = dYdX
+                #df['gmin'] = gmin                     
+                dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+                                alph=_ALPH2, dx=dX, 
+                                ep=_EP,
+                                scale=SCALE ,
+                                plotflag=False, 
+                                precondflag=False,
+                                diffkernel='abs',
+                                cgtol = 1e-5)
+                ddGmin = dGmin
+                peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                peaks = np.concatenate((peaks, peaks2), axis=None)
+
+                self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+                print('''
+                Do you want to keep this values?
+
+                1: Yes
+                2: No            
+                ''')
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+                if what_to_do == '1':
+                    break
+                if what_to_do == '2':
+                    pass
+
+        # ###################################################################################"
+        df['raw_slope'] = dYdX
+        
+        #df['d_gmin'] =  ['NA']+ddGmin.tolist()
+        df['d_gmin'] =  ddGmin
+
         #print(df)
         if len(peaks)>0:
             df['Peaks'] = np.array_str(_X[peaks])
         else:
             df['Peaks'] = 'NoPeak'
         #peaks = peaks + 
-        self._plot_tvregdiff(_X=_X, _y=gmin, _y2 = ddGmin, peaks=peaks)   
-        
+        #self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)  
         self.df_save.columns = df.columns
         self.df_save = pd.concat([self.df_save, df], axis = 0, ignore_index = True)
-        
-
-        #self._plot_tvregdiff(_X=_X, _y=ddGmin, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-3})$', ax2_label = 'double diff Gmin') 
-        
-        # self._change_det(df, COL_Y='gmin')
 
         return df
 
     def robust_differential(self):    
+        self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
-        self.df_save = pd.DataFrame(columns = range(0,15))
+        self.df_save = pd.DataFrame(columns = range(0,14))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
