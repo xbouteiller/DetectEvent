@@ -38,7 +38,7 @@ PATM = 'Patm'
 AREA = 'Area_m2'
 
 WIND_DIV = 8
-LAG_DIV = WIND_DIV * 45
+LAG_DIV = WIND_DIV * 200
 BOUND = 'NotSet'
 FRAC_P = 0.1
 DELTA_MULTI = 0.01
@@ -445,6 +445,8 @@ class ParseTreeFolder():
             plt.waitforbuttonpress(0)
             # input()
             plt.close()
+            print('\nSelected points at time : ', ' '.join([str(i[0]) for i in selected_points ]))
+            print('\n')
             self.global_score.append([self.sample, [i[0] for i in selected_points ]])  
 
 
@@ -458,8 +460,8 @@ class ParseTreeFolder():
             _wind = int(df.shape[0]/6)
             _lag = 1# int(df.shape[0]/4)
         else:
-            _wind = int(df.shape[0]/WIND_DIV)
-            _lag = int(df.shape[0]/LAG_DIV)
+            _wind = max(int(df.shape[0]/WIND_DIV),int(1))
+            _lag = max(int(df.shape[0]/LAG_DIV),int(1))
         _X = df['delta_time'].copy().values
         if COL_Y == 'standard':
             _y = df[YVAR].copy().values
@@ -512,8 +514,8 @@ class ParseTreeFolder():
 
             self.Xselected = df['delta_time'].values
             self.yselected = df[YVAR].copy().values
-            print(FRAC_P)
-            print(DELTA_MULTI)
+            #print(FRAC_P)
+            #print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
             if not self.Conductance:  
@@ -757,6 +759,7 @@ class ParseTreeFolder():
         _ALPH = ALPH/DIV_ALPH
         _ALPH2=ALPH/DIV_ALPH2
         _EP=EP
+        _EP2=EP
 
         print('''
             Do you want to work on keep this parameters for conductance computation ?
@@ -820,6 +823,13 @@ class ParseTreeFolder():
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
+                while True:
+                    try:
+                        
+                        _EP2= float(input('What is the value for epsilon for the derivation? (current value : {}) '.format(_EP2))or _EP2)
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
 
                 dYdX = TVRegDiff(data=_y ,itern=ITERN, 
                     alph=_ALPH, dx=dX, 
@@ -843,7 +853,7 @@ class ParseTreeFolder():
                 #df['gmin'] = gmin                     
                 dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
                                 alph=_ALPH2, dx=dX, 
-                                ep=_EP,
+                                ep=_EP2,
                                 scale=SCALE ,
                                 plotflag=False, 
                                 precondflag=False,
@@ -856,7 +866,7 @@ class ParseTreeFolder():
 
                 self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
                 print('''
-                    Do you want to work on keep this parameters for conductance computation ?
+                    Do you want to keep this parameters for conductance computation ?
 
                     1: Yes or exit
                     2: No, I want to adjust regularization parameters
