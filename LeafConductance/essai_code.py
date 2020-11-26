@@ -12,6 +12,8 @@ from scipy.optimize import curve_fit
 import time
 import sys
 from scipy.signal import find_peaks
+from scipy import stats
+
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
@@ -46,6 +48,7 @@ ITERN=20
 ALPH=10000
 EP=1e-9
 
+THRES = 2.8
 
 class ParseFile():
     import pandas as pd
@@ -103,6 +106,7 @@ class ParseTreeFolder():
 
         self.global_score = []
         self.Conductance = False
+        self.remove_outlier = False
 
         print('''
         WELCOME TO LEAFCONDUCTANCE
@@ -235,6 +239,9 @@ class ParseTreeFolder():
     def display_menu(self):
         print("""
         --------------------
+        -----   MENU   -----
+        --------------------
+
         List of actions
 
         1. Detect changes in curve (RMSE approach)
@@ -349,7 +356,7 @@ class ParseTreeFolder():
 
         Yidx=self.Ysmooth[self.Xselected == Xidx]
 
-
+        
         fig, ax1 = plt.subplots()
 
         color = 'tab:blue'
@@ -375,10 +382,13 @@ class ParseTreeFolder():
         ax2.tick_params(axis='y', labelcolor=color)
         ax2.legend(loc='right')
         fig.tight_layout()
+
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
         # input()
         plt.close()   
+
+       
 
         print('\nInterval method')
         for i in np.arange(0,len(idx)):
@@ -389,14 +399,54 @@ class ParseTreeFolder():
 
             1: Yes, save
             2: No, discard
-            3. Select value manually on graph (WORK IN PROGRESS)
+            3. Select values manually on graph
             ''')
-        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
 
         if what_to_do=='2':
             self.global_score.append([self.sample,'Discarded'])
         if what_to_do=='1':
             self.global_score.append([self.sample, Xidx])
+        if what_to_do=='3':
+            while True:
+                try:                        
+                    _Npoints = int(input('How many points do you want to select ? ') or 1)                
+                    break
+                except ValueError:
+                    print("Oops!  That was no valid number.  Try again...")
+            fig, ax1 = plt.subplots()
+
+            color = 'tab:blue'
+            ax1.set_xlabel('time (min)')
+            ax1.set_ylabel(self.sample, color=color)
+            ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+            ax1.tick_params(axis='y', labelcolor=color)
+            color = 'tab:red'
+            ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+            ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+            ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+            ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+            ax1.legend(loc='upper right')
+
+            ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+            color = 'tab:green'
+            ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+            ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
+            #ax2.tick_params(axis='y', labelcolor=color)
+            color = 'tab:orange'
+            ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+            ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
+            ax2.tick_params(axis='y', labelcolor=color)
+            ax2.legend(loc='right')
+            fig.tight_layout()
+            
+            selected_points = fig.ginput(_Npoints)
+            # plt.pause(PAUSE_GRAPH)
+            plt.waitforbuttonpress(0)
+            # input()
+            plt.close()
+            self.global_score.append([self.sample, [i[0] for i in selected_points ]])  
+
 
         print('gs',self.global_score)
 
@@ -427,13 +477,35 @@ class ParseTreeFolder():
         Ysmooth = lowess(exog = ex, endog = end, frac = fr, delta = delt, return_sorted = False)
         return Ysmooth
 
-    def _parse_samples(self, dffile, FUNC): 
-        import pandas as  pd
-        import numpy as np       
+    def _turn_on_off_remove_outlier(self, state):
+        self.remove_outlier=state
+
+    def _detect_outlier(self, df, thres):
+        df_s1 = df.shape[0]
+        z = np.abs(stats.zscore(df[YVAR].values))        
+        z_idx = np.where(z < thres)
+        #print(np.shape(z_idx))
+        #print(z_idx)
+        print('\nn outliers : {}\n'.format(df_s1-np.shape(z_idx[0])[0]))
+        df = df.iloc[z_idx[0]].reset_index().copy()
+        return df
+
+
+
+    def _parse_samples(self, dffile, FUNC):  
+
+        if self.Conductance:
+            self._turn_on_off_remove_outlier(state=True)
+        else:
+            self._turn_on_off_remove_outlier(state=False)   
 
         for sample in dffile[SAMPLE_ID].unique():
+            
             self.sample = sample
             df = dffile.loc[dffile[SAMPLE_ID]==sample,:].copy().reset_index()
+            if self.remove_outlier:
+                df = self._detect_outlier(df=df, thres =THRES)
+
             df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
             df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
             df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
@@ -535,7 +607,7 @@ class ParseTreeFolder():
 
     def change_detection(self):
         print('change_detection\n')
-
+        self.Conductance=False
         dimfolder = len(self.listOfFiles)
         li_all = []
         for d in np.arange(0,dimfolder):
@@ -557,7 +629,7 @@ class ParseTreeFolder():
 
         
         
-    def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' ):
+    def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' , manual_selection=False, Npoints=1):
         
         fig, ax1 = plt.subplots()
         color = 'tab:blue'
@@ -594,10 +666,14 @@ class ParseTreeFolder():
         ax2.legend(loc='upper right')
         ax3.legend(loc='right')
         fig.tight_layout()
+        if manual_selection:
+            selected_points=fig.ginput(Npoints)
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
         # input()
         plt.close()   
+        if manual_selection:
+            return selected_points
     
     
     def _tvregdiff(self,df):
@@ -678,37 +754,62 @@ class ParseTreeFolder():
         
         #####################################################################################"
         # 
-        #  
+        _ALPH = ALPH/DIV_ALPH
+        _ALPH2=ALPH/DIV_ALPH2
+        _EP=EP
+
         print('''
             Do you want to work on keep this parameters for conductance computation ?
 
-            1: Yes
-            2: No, I want to adjust parameters
+            1: Yes or exit
+            2: No, I want to adjust regularization parameters
+            3: No, I want to select peaks manually           
                     
             ''') 
 
-        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
         ########################################################################
-        if what_to_do=='1':
-            pass
-        if what_to_do=='2':
-            _ALPH = ALPH/DIV_ALPH
-            _ALPH2=ALPH/DIV_ALPH2
-            _EP=EP
-            while True:          
+        while True:
+            if what_to_do=='1':
+                break
+            if what_to_do=='3':
+                while True:
+                    try:                        
+                        _Npoints = int(input('How many points do you want to select ? ') or 1)                
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks, manual_selection=True, Npoints=_Npoints)  
+                peaks = [i[0] for i in sel_p]
+
+                print('Selected points at time : ', ' '.join(map(str,peaks)))
+
+
+                print('''
+                        Do you want to work on keep this parameters for conductance computation ?
+
+                        1: Yes or exit
+                        2: No, I want to adjust regularization parameters
+                        3: No, I want to select peaks manually           
+                                
+                        ''') 
+
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
+
+            if what_to_do=='2':
+                
+                #while True:          
                 while True:                        
                     try:
                         
                         _ALPH = float(input('What is the value for alpha? (current value : {}) '.format(_ALPH)) or _ALPH)
-                        #_FRAC = FRAC_P2
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")                    
                 while True:
                     try:
-                       
+                    
                         _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
-                        #_DELTA_MULTI = DELTA_MULTI2
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
@@ -716,7 +817,6 @@ class ParseTreeFolder():
                     try:
                         
                         _EP= float(input('What is the value for epsilon ? (current value : {}) '.format(_EP))or _EP)
-                        #_DELTA_MULTI = DELTA_MULTI2
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
@@ -756,16 +856,15 @@ class ParseTreeFolder():
 
                 self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
                 print('''
-                Do you want to keep this values?
+                    Do you want to work on keep this parameters for conductance computation ?
 
-                1: Yes
-                2: No            
-                ''')
-                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-                if what_to_do == '1':
-                    break
-                if what_to_do == '2':
-                    pass
+                    1: Yes or exit
+                    2: No, I want to adjust regularization parameters
+                    3: Yes, but I want to select peaks manually           
+                            
+                    ''') 
+
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
 
         # ###################################################################################"
         df['raw_slope'] = dYdX
@@ -775,11 +874,13 @@ class ParseTreeFolder():
 
         #print(df)
         if len(peaks)>0:
-            df['Peaks'] = np.array_str(_X[peaks])
+            try:
+                df['Peaks'] = np.array_str(_X[peaks])
+            except:                
+                df['Peaks'] = ' '.join(map(str,peaks))
         else:
             df['Peaks'] = 'NoPeak'
-        #peaks = peaks + 
-        #self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)  
+ 
         self.df_save.columns = df.columns
         self.df_save = pd.concat([self.df_save, df], axis = 0, ignore_index = True)
 
@@ -789,7 +890,7 @@ class ParseTreeFolder():
         self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
-        self.df_save = pd.DataFrame(columns = range(0,14))
+        self.df_save = pd.DataFrame(columns = range(0,15))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
