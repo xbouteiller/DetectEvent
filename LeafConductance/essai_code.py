@@ -45,8 +45,8 @@ DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
 
 ITERN=4000
-ALPH=200
-EP=1e-8
+ALPH=1000
+EP=1e-9
 KERNEL='abs'#'abs'
 THRES = 10 #3
 
@@ -671,6 +671,7 @@ class ParseTreeFolder():
         if manual_selection:
             selected_points=fig.ginput(Npoints)
         # plt.pause(PAUSE_GRAPH)
+        #plt.show()
         plt.waitforbuttonpress(0)
         # input()
         plt.close()   
@@ -692,17 +693,19 @@ class ParseTreeFolder():
             PRECOND = True
 
         if len(_X)<200:   # MAYBE HYPERPARAMETERS CAN BE DEFINED OTHERLY
-            DIV_ALPH = 1 # 1000
+            DIV_ALPH = 10 # 1000
             DIV_ALPH2 = 1000 # 1000
             DIST = 10
             PROM = 20 #10
-            
+            #EP = EP
+            EP2 = EP            
         else:
             DIV_ALPH = 1 #10
-            DIV_ALPH2= 100
+            DIV_ALPH2= 50
             DIST = 50 #200
             PROM = 3#4
-            
+            #EP = EP
+            EP2 = EP*1
 
         dYdX = TVRegDiff(data=_y ,itern=ITERN, 
                         alph=ALPH/DIV_ALPH, dx=dX, 
@@ -731,7 +734,7 @@ class ParseTreeFolder():
              
         dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
                         alph=ALPH/DIV_ALPH2, dx=dX, 
-                        ep=EP,
+                        ep=EP2,
                         scale=SCALE ,
                         plotflag=False, 
                         precondflag=PRECOND,
@@ -764,7 +767,7 @@ class ParseTreeFolder():
         _ALPH = ALPH/DIV_ALPH
         _ALPH2=ALPH/DIV_ALPH2
         _EP=EP
-        _EP2=EP
+        _EP2=EP2
 
         print('''
             Do you want to work on keep this parameters for conductance computation ?
@@ -788,7 +791,8 @@ class ParseTreeFolder():
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
                 sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks, manual_selection=True, Npoints=_Npoints)  
-                peaks = [i[0] for i in sel_p]
+                peaks = [str(np.round(i[0],3)) for i in sel_p]
+                #peaks = '['+peaks+']'
 
                 print('Selected points at time : ', ' '.join(map(str,peaks)))
 
@@ -809,8 +813,6 @@ class ParseTreeFolder():
                 print('''                
                     Alpha : Higher values increase regularization strenght and improve conditioning         
                     Epsilon : Parameter for avoiding division by zero smaller values give more accurate results with sharper jumps
-
-
                     ''')
                 #while True:          
                 while True:                        
@@ -908,6 +910,11 @@ class ParseTreeFolder():
         return df
 
     def robust_differential(self):    
+
+        print('''
+         WARNING : algorithm convergence time may be long
+        ''')
+        time.sleep(0.5)
         self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
