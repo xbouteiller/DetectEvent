@@ -44,11 +44,11 @@ FRAC_P = 0.1
 DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
 
-ITERN=20 
-ALPH=10000
-EP=1e-9
-
-THRES = 2.8
+ITERN=4000
+ALPH=200
+EP=1e-8
+KERNEL='abs'#'abs'
+THRES = 10 #3
 
 class ParseFile():
     import pandas as pd
@@ -686,29 +686,33 @@ class ParseTreeFolder():
         dX = _X[1] - _X[0]
         if len(_X)<1000:
             SCALE = 'small'
+            PRECOND = False
         else:
             SCALE = 'large'
+            PRECOND = True
 
         if len(_X)<200:   # MAYBE HYPERPARAMETERS CAN BE DEFINED OTHERLY
-            DIV_ALPH = 1000 # 1000
+            DIV_ALPH = 1 # 1000
             DIV_ALPH2 = 1000 # 1000
             DIST = 10
             PROM = 20 #10
+            
         else:
             DIV_ALPH = 1 #10
-            DIV_ALPH2= 10
-            DIST = 100 #200
-            PROM = 4#4
-        
+            DIV_ALPH2= 100
+            DIST = 50 #200
+            PROM = 3#4
+            
 
         dYdX = TVRegDiff(data=_y ,itern=ITERN, 
                         alph=ALPH/DIV_ALPH, dx=dX, 
                         ep=EP,
                         scale=SCALE ,
                         plotflag=False, 
-                        precondflag=False,
-                        diffkernel='abs',
-                        cgtol = 1e-5)    
+                        precondflag=PRECOND,
+                        diffkernel=KERNEL,
+                        u0=np.append([0],np.diff(_y)),
+                        cgtol = 1e-4)    
 
         
         #Conversion de la pente (en g/jour) en mmol/s
@@ -730,9 +734,10 @@ class ParseTreeFolder():
                         ep=EP,
                         scale=SCALE ,
                         plotflag=False, 
-                        precondflag=False,
-                        diffkernel='abs',
-                        cgtol = 1e-5)
+                        precondflag=PRECOND,
+                        diffkernel=KERNEL,
+                        u0=np.append([0],np.diff(gmin)),
+                        cgtol = 1e-4)
         # do we really need a second order derivative ?
         # ddGmin = TVRegDiff(data=dGmin,itern=ITERN, 
         #                 alph=ALPH/DIV_ALPH2, dx=dX, 
@@ -793,33 +798,37 @@ class ParseTreeFolder():
 
                         1: Yes or exit
                         2: No, I want to adjust regularization parameters
-                        3: No, I want to select peaks manually           
-                                
+                        3: No, I want to select peaks manually       
+                             
                         ''') 
 
                 what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
 
             if what_to_do=='2':
                 
+                print('''                
+                    Alpha : Higher values increase regularization strenght and improve conditioning         
+                    Epsilon : Parameter for avoiding division by zero smaller values give more accurate results with sharper jumps
+
+
+                    ''')
                 #while True:          
                 while True:                        
-                    try:
-                        
+                    try:                        
                         _ALPH = float(input('What is the value for alpha? (current value : {}) '.format(_ALPH)) or _ALPH)
                         break
                     except ValueError:
-                        print("Oops!  That was no valid number.  Try again...")                    
+                        print("Oops!  That was no valid number.  Try again...")                  
+
                 while True:
-                    try:
-                    
-                        _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
+                    try:                        
+                        _EP= float(input('What is the value for epsilon ? (current value : {}) '.format(_EP))or _EP)
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
                 while True:
-                    try:
-                        
-                        _EP= float(input('What is the value for epsilon ? (current value : {}) '.format(_EP))or _EP)
+                    try:                    
+                        _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
@@ -836,9 +845,10 @@ class ParseTreeFolder():
                     ep=_EP,
                     scale=SCALE ,
                     plotflag=False, 
-                    precondflag=False,
-                    diffkernel='abs',
-                    cgtol = 1e-5)    
+                    precondflag=PRECOND,
+                    diffkernel=KERNEL,
+                    u0=np.append([0],np.diff(_y)),
+                    cgtol = 1e-4)    
 
     
                 #Conversion de la pente (en g/jour) en mmol/s
@@ -856,9 +866,10 @@ class ParseTreeFolder():
                                 ep=_EP2,
                                 scale=SCALE ,
                                 plotflag=False, 
-                                precondflag=False,
-                                diffkernel='abs',
-                                cgtol = 1e-5)
+                                precondflag=PRECOND,
+                                diffkernel=KERNEL,
+                                u0=np.append([0],np.diff(gmin)),
+                                cgtol = 1e-4)
                 ddGmin = dGmin
                 peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
                 peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
@@ -870,8 +881,8 @@ class ParseTreeFolder():
 
                     1: Yes or exit
                     2: No, I want to adjust regularization parameters
-                    3: Yes, but I want to select peaks manually           
-                            
+                    3: Yes, but I want to select peaks manually  
+
                     ''') 
 
                 what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
