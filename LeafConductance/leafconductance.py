@@ -547,6 +547,9 @@ class ParseTreeFolder():
   
         idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
 
+
+        
+
     def _smoother(self, ex, end, fr, delta_multi):
         delt = delta_multi * ex.shape[0]
         Ysmooth = lowess(exog = ex, endog = end, frac = fr, delta = delt, return_sorted = False)
