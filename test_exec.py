@@ -5,7 +5,7 @@ if __name__=="__main__":
     #%% Dependencies
     import os
 
-    from LeafConductance.essai_code import ParseFile, ParseTreeFolder
+    from LeafConductance.leafconductance import ParseFile, ParseTreeFolder
 
     root = os.getcwd()
 

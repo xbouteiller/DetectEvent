@@ -891,6 +891,7 @@ class ParseTreeFolder():
 
         # ###################################################################################"
         df['raw_slope'] = dYdX
+        df['gmin'] = gmin
         
         #df['d_gmin'] =  ['NA']+ddGmin.tolist()
         df['d_gmin'] =  ddGmin
@@ -918,7 +919,7 @@ class ParseTreeFolder():
         self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
-        self.df_save = pd.DataFrame(columns = range(0,15))
+        self.df_save = pd.DataFrame(columns = range(0,16))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)

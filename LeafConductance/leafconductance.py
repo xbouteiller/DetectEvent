@@ -6,10 +6,18 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, RationalQuadratic, ExpSineSquared
 from loess.loess_1d import loess_1d
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from tvregdiff import TVRegDiff
+from LeafConductance.tvregdiff import log_iteration, TVRegDiff 
 import pandas as pd
 from scipy.optimize import curve_fit
 import time
+import sys
+from scipy.signal import find_peaks
+from scipy import stats
+import os
+from matplotlib import colors as mcolors
+
+
+colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
@@ -17,9 +25,9 @@ print('---------------            LeafConductance         ---------------------'
 print('---------------                  V0.1              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
-time.sleep(2)
+time.sleep(0.5)
 
-num_col = ['weight_g','T_C','RH', 'Patm']
+num_col = ['weight_g','T_C','RH', 'Patm', 'Area_m2']
 group_col=['campaign', 'sample_ID', 'Treatment', 'Operator']
 date=['date_time']
 
@@ -29,16 +37,29 @@ SEP = ','
 TIME_COL = 'date_time'
 SAMPLE_ID = 'sample_ID'
 YVAR = 'weight_g'
-WIND_DIV = 5
-LAG_DIV = WIND_DIV * 10
-BOUND = ([0.0,  0.0], [0.,  0.0])
+T = 'T_C'
+RH = 'RH'
+PATM = 'Patm'
+AREA = 'Area_m2'
 
+WIND_DIV = 8
+LAG_DIV = WIND_DIV * 200
+BOUND = 'NotSet'
+FRAC_P = 0.1
+DELTA_MULTI = 0.01
+PAUSE_GRAPH = 8
 
+ITERN=4000
+ALPH=1000
+EP=1e-9
+KERNEL='abs'#'abs'
+THRES = 10 #3
 
 class ParseFile():
     import pandas as pd
     import numpy as np
 
+    
 
     def __init__(self, path, skipr=1, sepa= SEP, encod = "utf-8"):
         '''
@@ -56,7 +77,7 @@ class ParseFile():
             self.file = pd.read_csv(path, skiprows=skipr)
         except:
             self.file = pd.read_csv(path, skiprows=skipr, sep=sepa, encoding=encod)
-
+    
 
     def clean_file(self):
         '''
@@ -66,20 +87,13 @@ class ParseFile():
         import pandas as pd
         import numpy as np
 
-        # #drop full na
-        # self.file = self.file.dropna(axis = 0, how = 'all')
-
-        # # convert to numeric if possible
-        # self.file = self.file.apply(lambda x: pd.to_numeric(x, errors ="ignore"))
-
-        # # lower strings
-        # self.file = self.file.applymap(lambda s:s.lower() if (isinstance(s, str) and s!='None')  else s)
 
         return self.file
 
 
 
 class ParseTreeFolder():
+
 
     def _get_valid_input(self, input_string, valid_options):
         input_string += "({}) ".format(", ".join(valid_options))
@@ -96,39 +110,45 @@ class ParseTreeFolder():
         from tkinter.filedialog import askopenfilename, askdirectory
 
         self.global_score = []
+        self.Conductance = False
+        self.remove_outlier = False
 
         print('''
         WELCOME TO LEAFCONDUCTANCE
 
-        Type 1 to start and parse a folder
-
-        1: Parse a folder
+        Press Enter to continue ...
+        
         ''')
-        self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
-
+        self.file_or_folder = '1'
+        input('')
+        # self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
         if self.file_or_folder== '1':
-            Tk().withdraw()
-            folder = askdirectory(title='What is the root folder that you want to parse ?')
+            ################################################### REACTIVATE
+            #Tk().withdraw()
+            #folder = askdirectory(title='What is the root folder that you want to parse ?')
+            folder = '/home/xavier/Documents/development/DetectEvent/data'
+            #####################################################""
             self.path = folder
             print('\n\n\nroot path is {}'.format(self.path))
+            ################################################### REACTIVATE
+            # print('''
+            # which method do you want to use for detecting cavisoft files ?
 
-            print('''
-            which method do you want to use for detecting cavisoft files ?
-
-            1: Detect all CSV files 
-            2: Detect string 'CONDUCTANCE' string in the first row
-            ''')
-            self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-
+            # 1: Detect all CSV files 
+            # 2: Detect string 'CONDUCTANCE' string in the first row
+            # ''')
+            # self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+            self.method_choice = '2' 
+            ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
 
 
         self.choices = {
         "1": self.change_detection,
-        "2": self.compute_conductance,
-        "3": self.extract_strings,
-        "4": self.erase,
-        "5": self.extract_strings_and_nums
+        "2": self.robust_differential,
+        "3": self._quit,
+        # "4": self.erase,
+        # "5": self.extract_strings_and_nums
         }
 
 
@@ -145,7 +165,7 @@ class ParseTreeFolder():
         d=os.path.join(p, s)
 
         return [os.path.join(d, f) for f in os.listdir(d) if\
-                f.endswith('.csv') and (re.search(r'CONDUCTANCE|conductance', pd.read_csv(os.path.join(d, f),sep=SEP,nrows=0).columns[0]) )]
+                f.endswith('.csv') and (re.search(r'conductance', pd.read_csv(os.path.join(self.path, f),sep=SEP,nrows=0).columns[0].lower()) )]
 
     
     def parse_folder(self):
@@ -167,7 +187,7 @@ class ParseTreeFolder():
                 try:
                     file_root = [os.path.join(self.path, f) for f in os.listdir(self.path) if f.endswith('.csv')]
                     self.listOfFiles.append(file_root)
-                    # print(file_root)
+                    print(file_root)
                 except:
                     print('no file detected within root directory')
                     pass
@@ -183,9 +203,11 @@ class ParseTreeFolder():
             if self.method_choice == '2':
                 try:
                     file_root = [os.path.join(self.path, f) for f in os.listdir(self.path) if\
-                    f.endswith('.csv') and (re.search(r'CONDUCTANCE|conductance', pd.read_csv(os.path.join(d, f),sep=SEP,nrows=0).columns[0]) )]
+                    f.endswith('.csv') and (re.search(r'conductance', pd.read_csv(os.path.join(self.path, f),sep=SEP,nrows=0).columns[0].lower()) )]
                     self.listOfFiles.append(file_root)
-                    # print(file_root)
+
+
+                    print(file_root)
                 except:
                     print('no file detected within root directory')
                     pass
@@ -222,119 +244,190 @@ class ParseTreeFolder():
     def display_menu(self):
         print("""
         --------------------
+        -----   MENU   -----
+        --------------------
+
         List of actions
 
         1. Detect changes in curve (RMSE approach)
         2. Compute conductance (robust differential approach)
+        3. Exit
         """)
+
+    def _quit(self):
+        print("Thank you for using your LeafConductance today.")
+        sys.exit(0)
 
     def run(self):
         '''Display the menu and respond to choices.'''
+        
+        while True:
+            self.display_menu()
+            choice = input("Enter an option: ")
 
-        self.display_menu()
-        choice = input("Enter an option: ")
-        action = self.choices.get(choice)
-        if action:
-            action()
-        else:
-            print("{0} is not a valid choice".format(choice))
-            self.run()
+            
+            action = self.choices.get(choice)
 
-
-    def _parse_samples(self, FUNC): 
-        import pandas as  pd
-        import numpy as np       
-
-        for sample in self.file[SAMPLE_ID].unique():
-            self.sample = sample
-            df = self.file[self.file[SAMPLE_ID]]
-            df[TIME_COL] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
-            df['delta_time'] = (df[TIME_COL]-df[TIME_COL].shift()).fillna(0)            
-            FUNC(df)
+            if action:
+                action()
+            else:
+                print("{0} is not a valid choice".format(choice))
+                self.run()
 
 
+    def _min_max(self, X): 
+        X_scaled = (X-np.min(X)) / (np.max(X) -  np.min(X))
+        return X_scaled
 
     def _RMSE(self, Ypred, Yreal):
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
         return rmse
-    def _fit_and_pred(self,X, y):
-        from sklearn.linear_model import LinearRegression
-        Xarr = np.array(X).reshape(-1,1)
-        yarr = np.array(y).reshape(-1,1)
-        reg = LinearRegression().fit(Xarr, yarr)
-        pred = reg.predict(Xarr)
+
+    def _fit_and_pred(self,X, y, mode, *args):
+        if mode == 'linear':
+            Xarr = np.array(X).reshape(-1,1)
+            yarr = np.array(y).reshape(-1,1)
+            reg = LinearRegression().fit(Xarr, yarr)
+            pred = reg.predict(Xarr)
+        if mode == 'exp':
+            Xarr = np.array(X).reshape(-1)
+            yarr = np.array(y).reshape(-1)
+            reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
+            A, B = reg     
+            pred = A * np.exp(-B * Xarr)
         rmse = self._RMSE(pred, yarr)
         return rmse
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
-        Xmax = np.shape(X)[0]-window+1
-        start = np.arange(0, Xmax, lag)
+        Xend = np.shape(X)[0]
+        Xmax = np.shape(X)[0]-lag-1
+        start = np.arange(window, Xend-window, lag)
 
         if mode == 'linear':
-            mean_start = X[[int(s + window/2) for s in start]]
-            score = [self._fit_and_pred(X[s:s+window], y[s:s+window]) 
-                    for s in start]    
-            return score, mean_start
+            mean_start = X[[int(Xend-s) for s in start]]
+            score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
+                    for s in start]    #[::-1]
         
         if mode == 'exp':
-            mean_start = X[[int(s + window/2) for s in start]]
-            
-            if BOUND == ([0.0,  0.0], [0.,  0.0]):
-                reg = curve_fit(self._func, X[lag:lag+window], y[lag:lag+window])[0]
-                A, B = reg 
-                b = ([A-0.1*A,B/10],[A+0.1*A, B*10])
+            mean_start = X[start]
+            if BOUND == 'NotSet':
+                try:
+                    reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
+                    Aa, Bb = reg                     
+                    bound = ([Aa-0.5*Aa,Bb/100],[Aa+0.5*Aa, Bb*100])
+                except:
+                    bound = ([0,1/1000000],[100, 1/100])
             else:
-                b=BOUND
+                bound=BOUND
 
-            score = [fit_and_pred_exp(X[s:s+window], y[s:s+window], b=b, p = p) 
-                    for s in start]    
-        
+            try:
+                score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
+                        for s in start]
+            except:
+                raise Exception('Failed to fit Exponential curve')
+
+        score = self._min_max(score)
+        #print('{} score'.format(mode), score)
         return score, mean_start
 
 
     def _func(self, x, a, b):
         return a * np.exp(-b * x) 
+
+    def _func_lin(self, x, a, b):
+        return a * x + b 
     
-    def _detect_b(self, X, y):
+    def _detect_b(self, X, y, mode):
         Xarr = np.array(X).reshape(-1)
         yarr = np.array(y).reshape(-1)
-        reg = curve_fit(func, Xarr, yarr)[0]
-
-
-
-    def _fit_and_pred_exp(self, X, y):
-        Xarr = np.array(X).reshape(-1)
-        yarr = np.array(y).reshape(-1)
-        b=self._detect_b(Xarr,yarr)
-        reg = curve_fit(self._func, Xarr, yarr, bounds=b)[0]
-        A, B = reg     
-        pred = A * np.exp(-B * Xarr)
-        rmse = RMSE(pred, yarr)
-        return rmse
+        if mode == 'exp':
+            reg = curve_fit(self._func, Xarr, yarr)[0]
+        return reg
 
     def _dcross(self, Yl, Ye):
         idx = np.argwhere(np.diff(np.sign(Yl - Ye))).flatten() 
         return idx
 
-    def _detect_crossing_int(self, Yexp, Ylin, X):
+    def _compute_slope(self, Xidx1, interval = False, *args, **kwargs):         
+
+        if len(Xidx1)>1:
+            Xidx1 = Xidx1[0]  
+
+        print('Xidx1: ', Xidx1)     
+
+        if interval:                       
+            Xidx2 = args[0]
+            if len(Xidx2)>1:
+                Xidx2 = Xidx2[0]
+            print('Xidx2: ', Xidx2)   
+            X = self.Xselected[(self.Xselected >= Xidx1) & (self.Xselected <= Xidx2)].copy()
+            y = self.yselected[(self.Xselected >= Xidx1) & (self.Xselected <= Xidx2)].copy()
+        else:
+            X = self.Xselected[self.Xselected >= Xidx1].copy()
+            y = self.yselected[self.Xselected >= Xidx1].copy()
+
+        slope, intercept, r_value, p_value, std_err = stats.linregress(X, y)
+
+        fitted_values = slope*X + intercept
+        rsquared = r_value**2
+
+        return slope, intercept, rsquared, fitted_values, X
+
+    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe):
         Ylin=np.array(Ylin)
         Yexp=np.array(Yexp)
-        X=np.array(X)  
-        
-        idx = self._dcross(Ylin, Yexp)
-        Xidx=X[idx]    
+        Xl=np.array(Xl)  
+        Xe=np.array(Xe) 
+        idx = self._dcross(Ylin[::-1], Yexp)
+        Xidx=Xe[idx]    
         idx_int = [[i, i+1] for i in idx]
-        Xidx_int = [[X[i], X[i+1] ]for i in idx]
-        Yidx=Ylin[idx]
+        Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
+
+        Yidx=self.Ysmooth[self.Xselected == Xidx]
 
         
-        plt.plot(X, Ylin)
-        plt.plot(X, Yexp)
+        fig, ax1 = plt.subplots()
+
+        color = 'tab:blue'
+        ax1.set_xlabel('time (min)')
+        ax1.set_ylabel(self.sample, color=color)
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+        ax1.tick_params(axis='y', labelcolor=color)
+        color = 'tab:red'
+        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+        ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+        ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+        ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+        ax1.legend(loc='upper right')
+
+        if len(Xidx)==1:
+            slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
+            ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+        else:
+            print('more than 1 crossing point were detected')
+
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        color = 'tab:green'
+        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+        ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
+        #ax2.tick_params(axis='y', labelcolor=color)
+        color = 'tab:orange'
+        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+        ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
+        ax2.tick_params(axis='y', labelcolor=color)
+        ax2.legend(loc='right')
+        fig.tight_layout()
+
         
-        for i in np.arange(0,len(idx)):
-            plt.hlines(Yidx[i], Xidx_int[i][0], Xidx_int[i][1], lw=4, color = 'red')
-        plt.show()     
-        
+
+        # plt.pause(PAUSE_GRAPH)
+        plt.waitforbuttonpress(0)
+        # input()
+        plt.close()   
+
+       
+
         print('\nInterval method')
         for i in np.arange(0,len(idx)):
             print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
@@ -342,499 +435,252 @@ class ParseTreeFolder():
         print('''
             Do you want to keep the crossing value ?
 
-            1: No, discard 
-            2: Yes, save
-            3. Select value manually on graph (WORK IN PROGRESS)
+            1: Yes, save
+            2: No, discard
+            3. Select values manually on graph
             ''')
-        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2')
-    
-        if what_to_do=='1':
-            self.global_score.append([self.sample,'Discarded', 'Discarded'])
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
+
         if what_to_do=='2':
-            self.global_score.append([self.sample,Xidx_int[0], Xidx_int[1]])
-
-
-
-        return idx, Xidx, Xidx_int 
-
-    def _change_det(self, df):
-        _wind = int(df.shape[0]/WIND_DIV)
-        _lag = int(df.shape[0]/LAG_DIV)
-        self._X = df['delta_time']
-        self._y = df[XVAR]
-
-        score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
-        score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
-        idx, Xidx, Xidx_int = self._detect_crossing_int(score_l, score_e, mean_start_l)
-
-    def change_detection(self):
-        print('change_detection\n')
-        self._parse_samples(self, FUNC = self._change_det)
-
-
-
-  
-
-
-            
-
-
-    def compute_conductance(self):
-        import numpy as np
-        import pandas as pd
-        print('choose to do modify')
-
-        while True:
-            try:
-                nval = float(input('how many values do you want to modify ? '))
-                break
-            except ValueError:
-                print("Oops!  That was no valid number.  Try again...")
-
-        for i in np.arange(0,nval):
-
-            tobemodified = input('Which value do you want to change ? ')
+            self.global_score.append([self.sample,'Discarded'])
+        if what_to_do=='1':
+            self.global_score.append([self.sample, Xidx, slope, rsquared])
+        if what_to_do=='3':
             while True:
-                if tobemodified in self.frame[self.i].unique().tolist():
-                    break
-                else:
-                    print("Oops! identifiant not existing choose one among : {}".format(self.frame[self.i].unique().tolist()))
-                    tobemodified = input('Which value do you want to change ? ')
-
-            newvalue = input('What is the new value ? ')
-            self.frame.loc[self.frame[self.i]==tobemodified,self.i] = newvalue
-            print('new values are {}'.format(self.frame[self.i].unique()))
-            input('press any key to continue')
-
-    def extract_strings(self):
-        print('choose to extract strings')
-        import re
-        import numpy as np
-
-        print('col',self.frame[self.i])
-
-
-        self.frame[self.i]=self.frame[self.i].str.extract('([a-zA-Z]+)', expand = False)
-
-        print('modified to {}'.format(self.frame[self.i].unique()))
-        inp=input('press any key to continue --- or enter 1 to modify values ---')
-        if inp == str(1):
-            self.modify()
-        else:
-            print('no values to be modified')
-
-    def extract_strings_and_nums(self):
-        print('choose to extract strings and numbers')
-        import re
-        import numpy as np
-        # print('col',self.frame[self.i])
-        reg = self.frame[self.i].str.extract('([a-zA-Z]+)\W(\d+)', expand = False)
-
-        self.frame[self.i]=reg[0]
-        self.frame['Sample_ref_2']=reg[1]#.astype('int')
-        print('modified {} to {}'.format(self.i, self.frame[self.i].unique()))
-        print('modified "Sample_ref_2" to {}'.format(self.frame['Sample_ref_2'].unique()))
-
-        inp=input('press any key to continue --- or enter 1 to modify {} values ---'.format(self.i))
-        if inp == str(1):
-            self.modify()
-        else:
-            print('no values to be modified')
-
-    def erase(self):
-        import numpy as np
-        import pandas as pd
-        print('choose to do erase rows')
-        while True:
-            try:
-                nval = float(input('how many values do you want to erase ? '))
-                break
-            except ValueError:
-                print("Oops!  That was no valid number.  Try again...")
-
-
-        for i in np.arange(0,nval):
-            tobemodified = input('Which row value do you want to erase ? ')
-            while True:
-                if tobemodified in self.frame[self.i].unique().tolist():
-                    break
-                else:
-                    print("Oops! values not existing in {} choose one among : {}".format(self.i, self.frame[self.i].unique().tolist()))
-                    tobemodified = input('Which row value do you want to erase ? ')
-
-            self.frame=self.frame[self.frame[self.i]!=tobemodified]
-            print('new values are {}'.format(self.frame[self.i].unique()))
-            input('press any key to continue')
-
-    def _clean_plc(self):
-        import pandas as pd
-        # print(self.frame['PLC'].str.isnumeric().values)
-        # print(self.frame.shape)
-        # self.frame=self.frame[self.frame['PLC'].str.isnumeric().values]
-        # self.frame['PLC']=pd.to_numeric(self.frame['PLC'].values)
-        # print(self.frame.shape)
-        # self.frame['PLC']<=100
-        # print(self.frame.shape)
-        # print(self.frame['PLC'])
-        # print(self.frame['PLC'].str.isdigit().values)
-        # print(pd.to_numeric(self.frame['PLC'], errors='coerce').notnull())
-        # print(pd.to_numeric(self.frame['PLC'], errors='coerce').notnull().shape)
-        try:
-            n0r=self.frame.shape[0]
-            self.frame=self.frame[pd.to_numeric(self.frame['PLC'], errors='coerce').notnull()]
-            self.frame['PLC']=pd.to_numeric(self.frame['PLC'].values)
-            n1r=self.frame.shape[0]
-            print('\n\nremoving non numeric PLC, {} rows removed'.format(n1r-n0r))
-            self.frame=self.frame[self.frame['PLC']<=100]
-            n2r=self.frame.shape[0]
-            print('removing PLC values higher than 100, {} rows removed'.format(n2r-n1r))
-        except:
-            print('an exception occured when trying to clean PLC values')
-
-    def clean_plc(self):
-            import pandas as pd
-            print('\n ---------------------------------------------------------------------')
-            print('Cleaning PLC values')
-            self._clean_plc()
-
-    def check_frame_num(self):
-        import pandas as pd
-        all_cn, cn = self._check_num(_df = self.frame , _col= num_col)
-        # cn = self._check_num(_df = self.frame , _col= num_col)[1]
-
-        # if not all_cn:
-        #     print('\n -----------------------')
-        #     [print('col {} is Numeric'.format(i)) if j else print('col {} is not Numeric'.format(i)) for i, j in zip(num_col, cn)]
-        #     input('press any key to continue')
-        if not all_cn:
-            print('\n\n ---------------------------------------------------------------------')
-            print('checking numerical columns\n')
-            [print('col {} is Numeric'.format(i)) if j else print('col {} is not Numeric'.format(i)) for i, j in zip(num_col, cn)]
-
-            for i, j in zip(num_col, cn):
-                if not j:
-                    self.i=i
-                    # I want to register on my log the message recived on ORIGINAL VALUE
-                    # print(self.frame[self.i].head())
-                    mask = pd.to_numeric(self.frame[self.i], errors='coerce').isna()
-                    #if possible missing values
-                    # mask = pd.to_numeric(df['ORIGINAL_VALUE'].fillna('0'), errors='coerce').isna()
-                    L = self.frame.loc[mask, self.i].tolist()
-                    print('\nin col {}'.format(self.i))
-                    print ("Not converted to numeric values are: " + ", ".join(L))
-
-                    print('What do you want to do ? ')
-                    self.run()
-
-
-
-    def check_frame_group(self):
-            all_cg, cg= self._check_group(_df = self.frame , _col = group_col)#[0]
-            # cg = self._check_group(_df = self.frame , _col = group_col)[1]
-            if not all_cg:
-                print('\n\n ---------------------------------------------------------------------')
-                print('checking categorical columns\n')
-                [print('label of col {} is unique'.format(i)) if j else print('label of col {} is NOT unique'.format(i)) for i, j in zip(group_col, cg)]
-
-                for i, j in zip(group_col, cg):
-                    if not j:
-                        self.i=i
-                        print('labels of col {} are {}\nWhat do you want to do ?'.format(self.i, self.frame[self.i].unique()))
-                        self.run()
-
-    def _compute_empty(self):
-        self.frame[empty_col]=self.frame[empty_col].fillna(self.frame['Sample_ref_1']-self.frame['Sample_ref_1'].min())
-        print('new value in {} are {}'.format(empty_col, self.frame[empty_col].unique()))
-        input('press any key to continue')
-
-    def _manual_empty(self):
-        for man in self.frame['Sample_ref_1'].unique():
-            if any(self.frame.loc[self.frame['Sample_ref_1']==man, empty_col].isna()):
-                while True:
-                    try:
-                        newvalue= float(input('What is the identifiant for "ref number 2" for individual {}: '.format(man)))
-                        break
-                    except ValueError:
-                        print("Oops!  That was no valid number.  Try again...")
-                self.frame.loc[self.frame['Sample_ref_1']==man,empty_col]=newvalue
-            else:
-                pass
-
-        print('new value in {} are {}'.format(empty_col, self.frame[empty_col].unique()))
-        input('press any key to continue')
-
-    def _extract_empty(self):
-        self.frame[empty_col]=self.frame[empty_col].fillna(self.frame['Comment'].str.extract('(\d+)', expand = False))
-        print('new value in {} are {}'.format(empty_col, self.frame[empty_col].unique()))
-        input('press any key to continue')
-
-    def check_frame_empty(self):
-        any_empty, empty = self._check_empty(_df = self.frame , _col= empty_col)
-        ae=0
-        while any_empty:
-            print('\n ---------------------------------------------------------------------')
-            print('parsing list of files from : {}\n'.format(self.presentfile))
-
-            print('{} contains empty values'.format(empty_col))
-            print('value in Comment columns are {}'.format(self.frame['Comment'].unique()))
-            print('''
-            --------------------
-            List of actions
-
-            1: do nothing
-            2: calculate from 1 to n
-            3: extract numbers from Comment columns
-            4: enter values manually
-            ''')
-            wtd = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3', '4'))
-            if wtd == '1':
-                break
-            if wtd == '2':
-                self._compute_empty()
-                any_empty = self._check_empty(_df = self.frame , _col= empty_col)[0]
-            if wtd == '3':
-                self._extract_empty()
-                any_empty = self._check_empty(_df = self.frame , _col= empty_col)[0]
-            if wtd == '4':
-                self._manual_empty()
-                any_empty = self._check_empty(_df = self.frame , _col= empty_col)[0]
-            ae+=1
-        if ae>0:
-            print('\nExiting from empty verification\nnew value in {} are {}'.format(empty_col, self.frame[empty_col].unique()))
-
-
-    def _inactive_indiv(self):
-        while True:
-            try:
-                newvalue= float(input('What is the identifiant of the individual that you want to inactive ? '))
-                break
-            except ValueError:
-                print("Oops!  That was no valid number.  Try again...")
-
-        while True:
-            if newvalue in self.frame['Sample_ref_1'].unique():
-                break
-            else:
-                print("Oops! identifiant not existing choose one among : {}".format(self.frame['Sample_ref_1'].unique().tolist()))
-                while True:
-                    try:
-                        newvalue= float(input('What is the identifiant of the individual that you want to inactive ? '))
-                        break
-                    except ValueError:
-                        print("Oops!  That was no valid number.  Try again...")
-
-        self.frame.loc[self.frame['Sample_ref_1']==newvalue,'Note']='yes'
-
-
-    def inactive_indiv(self):
-        print('\n ---------------------------------------------------------------------')
-        print('\nDo you want to inactive (turn to yes) some individuals ? ')
-
-        print('''
-        --------------------
-        List of actions
-
-        1: no, escape and continue
-        2: yes, inactive some individuals
-        ''')
-        wtd = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-
-        if wtd == '2':
-            inactive = True
-        else:
-            inactive = False
-
-        while inactive:
-            self._inactive_indiv()
-            exit = input('press any key to continue or enter -- exit -- to stop ')
-            if exit == 'exit' or exit == 'e':
-                inactive = False
-
-        L = self.frame.loc[self.frame['Note']=='yes','Sample_ref_1'].unique().tolist()
-        L = [str(i) for i in L]
-        print('\nExiting from inactivating individuals\ninactivated individuals are : ' + ", ".join(L))
-
-
-    def _change_values(self):
-
-        # num_col = ['PLC','Meas_cavispeed_rpm','Pressure_Mpa']
-        # group_col=['Sampling_location', 'Treatment', 'Operator']
-        # empty_col='Sample_ref_2'
-
-
-        print('''
-        --------------------
-        Columns that you can change
-
-        1: Sample_ref_2 (tree number)
-        2: Sampling_location
-        3: Treatment
-        4: Operator
-        5: Note
-        6: exit
-        ''')
-        ctc = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3','4','5','6'))
-
-        if ctc == '1':
-            col_to_change = 'Sample_ref_2'
-        if ctc == '2':
-            col_to_change = 'Sampling_location'
-        if ctc == '3':
-            col_to_change = 'Treatment'
-        if ctc == '4':
-            col_to_change = 'Operator'
-        if ctc == '5':
-            col_to_change = 'Note'
-        if ctc == '6':
-            col_to_change = '-- exiting--'
-
-        print('\nmodified column will be : {}'.format(col_to_change))
-
-        if ctc == '6':
-            pass
-        else:
-            while True:
-                try:
-                    newvalue= float(input('What is the identifiant of the individual that you want to change ? '))
+                try:                        
+                    _Npoints = int(input('How many points do you want to select ? ') or 1)                
                     break
                 except ValueError:
                     print("Oops!  That was no valid number.  Try again...")
 
-            while True:
-                if newvalue in self.frame['Sample_ref_1'].unique():
-                    break
-                else:
-                    print("Oops! identifiant not existing choose one among : {}".format(self.frame['Sample_ref_1'].unique().tolist()))
-                    while True:
-                        try:
-                            newvalue= float(input('What is the identifiant of the individual that you want to change ? '))
-                            break
-                        except ValueError:
-                            print("Oops!  That was no valid number.  Try again...")
+            First_pass = 0
+            while First_pass < 2:
+                fig, ax1 = plt.subplots()
 
-            modified_value= input('\nWhat is the new value that you want to change for individual {} in column {} ? '.format(newvalue, col_to_change))
-            self.frame.loc[self.frame['Sample_ref_1']==newvalue,col_to_change]=modified_value
-            # print(self.frame.loc[self.frame['Sample_ref_1']==newvalue,col_to_change])
-            assert self.frame.loc[self.frame['Sample_ref_1']==newvalue,col_to_change].unique().tolist() == [modified_value], 'pb with new value'
+                color = 'tab:blue'
+                ax1.set_xlabel('time (min)')
+                ax1.set_ylabel(self.sample, color=color)
+                ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+                ax1.tick_params(axis='y', labelcolor=color)
+                color = 'tab:red'
+                ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+                ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+                ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+                ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+                ax1.legend(loc='upper right')
+                        
 
-    def manual_change(self):
-                print('\n ---------------------------------------------------------------------')
-                print('\nDo you want to change manually some values ? ')
+                ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+                color = 'tab:green'
+                ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+                ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
+                #ax2.tick_params(axis='y', labelcolor=color)
+                color = 'tab:orange'
+                ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+                ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
+                ax2.tick_params(axis='y', labelcolor=color)
+                ax2.legend(loc='right')
+                fig.tight_layout()
 
-                print('''
-                --------------------
-                List of actions
+                if First_pass == 0:
+                    selected_points = fig.ginput(_Npoints)
+                    if _Npoints==1:
+                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=selected_points[0])                       
+                    elif _Npoints==2:
+                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(selected_points[0], True, selected_points[1],)                        
+                    else:
+                        print('unable to fit regression')
 
-                1: no, escape and continue
-                2: yes, change manually some individuals values
-                ''')
-                wtd = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+                else:                    
+                    if _Npoints==1:                       
+                        ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+                    elif _Npoints==2:                        
+                        ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+                    else:
+                        print('unable to fit regression')
+                
+                plt.waitforbuttonpress(0)      
+                plt.close()
+                First_pass+=1
 
-                if wtd == '2':
-                    change = True
-                else:
-                    change = False
-
-                while change:
-                    self._change_values()
-                    exit = input('press any key to continue or enter -- exit -- to stop ')
-                    if exit == 'exit' or exit == 'e':
-                        change = False
+           
+            print('\nSelected points at time : ', ' '.join([str(i[0]) for i in selected_points ]))
+            print('\n')
+            self.global_score.append([self.sample, [i[0] for i in selected_points ], slope, rsquared])  
 
 
-    def check_unicity(self):
-        print('\n ---------------------------------------------------------------------')
-        print('\nChecking unicity')
+        print('gs',self.global_score)
 
-        print('REP column already exists ? {}'.format('REP' in self.frame.columns))
-        if 'REP' in self.frame.columns:
-            self.frame['REP']=self.frame['REP'].fillna(1)
-            print('empty REP column values filled with 1')
+        return idx, Xidx, Xidx_int 
+    
+    def _change_det(self, df, COL_Y='standard'):
+
+        if df.shape[0] < 100:
+            _wind = int(df.shape[0]/6)
+            _lag = 1# int(df.shape[0]/4)
         else:
-            self.frame['REP']=1
-            print('REP column created')
+            _wind = max(int(df.shape[0]/WIND_DIV),int(1))
+            _lag = max(int(df.shape[0]/LAG_DIV),int(1))
+        _X = df['delta_time'].copy().values
+        if COL_Y == 'standard':
+            _y = df[YVAR].copy().values
+        else:
+             _y = df[COL_Y].copy().values
 
-        pb = []
-        for camp in self.frame['Campaign_name'].unique():
-            for loc in self.frame['Sampling_location'].unique():
-                for sp in self.frame['Species'].unique():
-                    for tr in self.frame['Treatment'].unique():
-                        for cav in self.frame['Sample_ref_2'].unique():
-                            for rep in self.frame['REP'].unique():
-                                nval = len(self.frame.loc[(self.frame['Campaign_name']==camp) & (self.frame['Sampling_location']==loc) & (self.frame['Species']==sp) & (self.frame['Treatment']==tr) & (self.frame['Sample_ref_2']==cav) & (self.frame['REP']==rep),'Sample_ref_1'].unique().tolist())
-                                # print(nval)
-                                if nval >1:
-                                    pb.append([camp,loc,sp,tr,rep,cav,nval])
+        if self.df_value is None:
+            self.df_value = pd.DataFrame(columns = df.columns)
+        
+        self.df_value = pd.concat([self.df_rmse, df], axis = 0, ignore_index = True)
 
 
-        # print(self.frame['REP'])
+        score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
+        score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
 
-        for n in pb:
-            cavit_number = self.frame.loc[(self.frame['Campaign_name']==n[0]) & (self.frame['Sampling_location']==n[1]) & (self.frame['Species']==n[2]) & (self.frame['Treatment']==n[3]) & (self.frame['REP']==n[4]) & (self.frame['Sample_ref_2']==n[5]),'Sample_ref_1'].unique().tolist()
-            tree_number = self.frame.loc[(self.frame['Campaign_name']==n[0]) & (self.frame['Sampling_location']==n[1]) & (self.frame['Species']==n[2]) & (self.frame['Treatment']==n[3]) & (self.frame['REP']==n[4]) & (self.frame['Sample_ref_2']==n[5]),'Sample_ref_2'].unique().tolist()
-            print('''
-                 ------------------
-                 description
+        if self.df_rmse is None:
+            self.df_rmse = pd.DataFrame(columns = ['Sample', 'score_lin', 'Start_lin', 'score_exp', 'Start_exp'])        
+        df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'score_lin':score_l, 'Start_lin':mean_start_l, 'score_exp':score_e, 'Start_exp':mean_start_e]})        
+        self.df_rmse = pd.concat([self.df_temp_rmse, df], axis = 0, ignore_index = True)
+  
+        idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
 
-                 campaign: {}
-                 site: {}
-                 species: {}
-                 treament: {}
-                 repetition: {}
-                 sample ref 1 (cavit number) : {}
-                 sample ref 2 (tree number): {}
-                  '''.format(n[0],n[1],n[2],n[3],n[4],cavit_number, tree_number))
+    def _smoother(self, ex, end, fr, delta_multi):
+        delt = delta_multi * ex.shape[0]
+        Ysmooth = lowess(exog = ex, endog = end, frac = fr, delta = delt, return_sorted = False)
+        return Ysmooth
 
-            print('''
-                --------------------
-                Error sample ref 1 don't refer to an unique tree
-                What do you want to do ?
+    def _turn_on_off_remove_outlier(self, state):
+        self.remove_outlier=state
 
-                1: nothing, escape and continue
-                2: change manually some individual values (sample ref 2)
-                3: automatically compute repetition numbers for each sample ref 1
-                4: manual change (if you want to change other column value e.g treatment)
-                ''')
-            wtd = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3', '4'))
+    def _detect_outlier(self, df, thres):
+        df_s1 = df.shape[0]
+        z = np.abs(stats.zscore(df[YVAR].values))        
+        z_idx = np.where(z < thres)
+        #print(np.shape(z_idx))
+        #print(z_idx)
+        print('\nn outliers : {}\n'.format(df_s1-np.shape(z_idx[0])[0]))
+        df = df.iloc[z_idx[0]].reset_index().copy()
+        return df
 
-            if wtd == '6':
-                pass
 
-            if wtd == '2':
-                for caval in cavit_number:
-                    while True:
-                        try:
-                            newvalue= float(input('What is the new identifiant for "Sample_ref_2" for individual {}: '.format(caval)))
+
+    def _parse_samples(self, dffile, FUNC):  
+
+        if self.Conductance:
+            self._turn_on_off_remove_outlier(state=True)
+        else:
+            self._turn_on_off_remove_outlier(state=False)   
+
+        for sample in dffile[SAMPLE_ID].unique():
+            
+            self.sample = sample
+            df = dffile.loc[dffile[SAMPLE_ID]==sample,:].copy().reset_index()
+            if self.remove_outlier:
+                df = self._detect_outlier(df=df, thres =THRES)
+
+            df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
+            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+            df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+
+            self.Xselected = df['delta_time'].values
+            self.yselected = df[YVAR].copy().values
+            #print(FRAC_P)
+            #print(DELTA_MULTI)
+            self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
+
+            if not self.Conductance:  
+                plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+                plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
+                plt.legend()    
+                # plt.pause(PAUSE_GRAPH/10)
+                plt.waitforbuttonpress(0)
+                # input()
+                plt.close() 
+
+            
+                print('''
+                Do you want to work on smoothed data ?
+
+                1: Yes
+                2: Yes, But I want to adjust smoothing parameters
+                3: No            
+                ''') 
+
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
+                ########################################################################
+                if what_to_do=='1':
+                    df[YVAR] = self.Ysmooth.copy()
+                if what_to_do=='2':
+                    while True:          
+                        while True:
+                            
+                            try:
+                                _FRAC=0.1
+                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)))
+                                _FRAC = FRAC_P2
+                                break
+                            except ValueError:
+                                print("Oops!  That was no valid number.  Try again...")                    
+                        while True:
+
+                            try:
+                                _DELTA_MULTI=0.01
+                                DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)))
+                                _DELTA_MULTI = DELTA_MULTI2
+                                break
+                            except ValueError:
+                                print("Oops!  That was no valid number.  Try again...")
+
+                        self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P2, delta_multi = DELTA_MULTI2)
+                        plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
+                        plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
+                        plt.legend()    
+                        # plt.pause(PAUSE_GRAPH/10)
+                        plt.waitforbuttonpress(0)
+                        # input()
+                        plt.close()   
+                        print('''
+                        Do you want to keep this values?
+
+                        1: Yes
+                        2: No            
+                        ''')
+                        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+                        if what_to_do == '1':
                             break
-                        except ValueError:
-                            print("Oops!  That was no valid number.  Try again...")
-                    self.frame.loc[self.frame['Sample_ref_1']==caval,'Sample_ref_2']=newvalue
+                        if what_to_do == '2':
+                            pass
+                    df['raw_data'] = df[YVAR].copy()
+                    df['smooth_data'] = self.Ysmooth.copy()
+                    df[YVAR] = self.Ysmooth.copy()
+        
+            FUNC(df)
+            #return dfe
+         
 
-                print('new value in {} are {}'.format('Sample_ref_2', self.frame['Sample_ref_2'].unique()))
-                input('press any key to continue')
+    def _robust_import(self, elem):
+        if self.file_or_folder== '1':
+            skip=1
+        else:
+            skip=0
+        try:
+            dffile = ParseFile(path = elem, skipr=skip).clean_file()
+        except:
+            encodi='latin'
+            dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
 
-            if wtd == '3':
-                repet = 1
-                for ca in cavit_number:
-                    # print(self.frame.loc['sample ref 1'==ca,['REP']])
-                    self.frame.loc[self.frame['Sample_ref_1']==ca,['REP']]=repet
-                    repet += 1
+            if dffile.shape[1] == 1:
+                separ=';'
+                try:
+                    dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
+                except:
+                    encodi='latin'
+                    dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+        return dffile
+        
 
-                print('rep values for {} are {}'.format(cavit_number, self.frame.loc[[True if ca in cavit_number else False  for ca in self.frame.Sample_ref_1],'REP'].unique()))
-                input('press any key to continue')
-
-            if wtd == '4':
-                self.manual_change()
-
-    def append_values(self):
-        '''
-        method for filling the lists
-        '''
-
-        import numpy as np
-        import pandas as pd
-
-
+    def change_detection(self):
+        print('change_detection\n')
+        self.Conductance=False
         dimfolder = len(self.listOfFiles)
         li_all = []
         for d in np.arange(0,dimfolder):
@@ -845,141 +691,329 @@ class ParseTreeFolder():
                 self.presentfile=self.listOfFiles[d][0]
             except:
                 self.presentfile = 'No file'
+            
+            self.df_rmse = None
+            self.df_value = None
             print('parsing list of files from : {}'.format(self.presentfile))
-
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
-                    # print(elem)
-                    if self.file_or_folder== '1':
-                        skip=1
-                    else:
-                        skip=0
-                    try:
-                        df = ParseFile(path = elem, skipr=skip).clean_file()
-                    except:
-                        encodi='latin'
-                        df = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
+                    dffile = self._robust_import(elem)                    
+                    
+                    self._parse_samples(dffile = dffile, FUNC = self._change_det)
+                    pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem)))
+                    self.df_rmse.to_csv('RMSE_score_'+str(os.path.basename(elem)))
+                    self.df_value.to_csv('df_complete_'+str(os.path.basename(elem)))
+                    self.df_rmse = None
+                    self.df_value = None
+                    self.global_score = []
 
-                    if df.shape[1] == 1:
-                        separ=';'
-                        try:
-                            df = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
-                        except:
-                            encodi='latin'
-                            df = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+            # pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
+            # self.df_rmse.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
+            # self.df_value.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
+            # self.df_rmse = None
+            # self.df_value = None
+        
+        
+    def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' , manual_selection=False, Npoints=1):
+        
+        fig, ax1 = plt.subplots()
+        color = 'tab:blue'
+        ax1.set_xlabel('time (min)')
+        ax1.set_ylabel(self.sample + '\nWeight (g)', color=color)
+        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'data')
+        ax1.tick_params(axis='y', labelcolor=color)
+        color = 'tab:red'
+        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+        
 
-                    # print(df)
-                    li.append(df)
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
 
-                self.frame = pd.concat(li, axis=0, ignore_index=True, sort=False)
-                print('shape of frame is {}'.format(self.frame.shape))
-                self.check_frame_num()
-                self.check_frame_group()
-                self.check_frame_empty()
-                self.inactive_indiv()
-                self.manual_change()
-                self.clean_plc()
-                self.check_unicity()
-                li_all.append(self.frame)
-                #check integrity
-            else:
-                print('skip empty folder')
-                pass
+        color = 'tab:green'       
+        
+        ax2.set_ylabel(ax2_Y, color=color)  # we already handled the x-label with ax1
+        ax2.plot(_X, _y, color=color, marker='.', label = ax2_label)
+        ax2.tick_params(axis='y', labelcolor=color)
+        
+        #ax2.plot(_X[peaks], _y[peaks], "x", markersize=10, mew=4, c = 'red')
 
-        self.final_frame = pd.concat(li_all, axis=0, ignore_index=True, sort=False)
-        print('shape of final frame is {}'.format(self.final_frame.shape))
+        ax3 = ax1.twinx()
+        color = 'tab:orange'
+        ax3.plot(_X, _y2, color=color, marker='.', label = 'first order derivative ' + ax2_label)
+        ax3.tick_params(axis='y', labelcolor=color, 
+                        which='both',      # both major and minor ticks are affected
+                        bottom=False,      # ticks along the bottom edge are off
+                        top=False,         # ticks along the top edge are off
+                        labelbottom=False)        
+        ax3.plot(_X[peaks], _y2[peaks], "x", markersize=10, mew=4, color = 'red', label = 'Peak')
+        ax3.vlines(ymin=np.min(_y2),ymax = np.max(_y2),x=_X[peaks], color='red', lw=0.8, linestyle='--')
+        ax3.axis('off')
+        ax1.legend(loc='upper left')
+        ax2.legend(loc='upper right')
+        ax3.legend(loc='right')
+        fig.tight_layout()
+        if manual_selection:
+            selected_points=fig.ginput(Npoints)
+        # plt.pause(PAUSE_GRAPH)
+        #plt.show()
+        plt.waitforbuttonpress(0)
+        # input()
+        plt.close()   
+        if manual_selection:
+            return selected_points
+    
+    
+    def _tvregdiff(self,df):
 
-        return self.final_frame
+        _X = df['delta_time'].copy().values
+        _y = df[YVAR].copy().values
 
-    def _summarize_df(self):
-        import pandas as pd
-        import numpy as np
-
-        print('\n\n---------------------------------------------------------------------')
-        print('data frame summary')
-        print('\nnumerical columns\n')
-        for i in num_col:
-            print('- for : {0}, mean is : {1:.2f}, sd is : {2:.2f}, min is : {3:.2f}, max is : {4:.2f}'.format(i,np.mean(self.frame[i]),np.std(self.frame[i]),np.min(self.frame[i]),np.max(self.frame[i])))
-
-        print('\ncategorical columns')
-        for i in group_col+['Note']:
-            print('\n- for : {}, categories are : {}'.format(i,self.frame[i].unique().tolist()))
-            print(self.frame[i].value_counts())
-
-    def save_finaldf(self):
-        '''
-        saved the concatened df into a csv file
-        '''
-        import pandas as pd
-        import os
-        from tkinter import Tk
-        from tkinter.filedialog import asksaveasfilename
-        # import time
-
-        self._summarize_df()
-        print('''
-        --------------------
-        Last step
-        Do you want to save the data frame or to restart the process ?
-
-        1. save
-        2. restart verifs
-        ''')
-
-        finchoi=self._get_valid_input('What is your choice ? Choose one of : ', ('1','2'))
-
-        if finchoi == '1':
-            pass
+        dX = _X[1] - _X[0]
+        if len(_X)<1000:
+            SCALE = 'small'
+            PRECOND = False
         else:
-            while finchoi == '2':
-                self.frame = self.final_frame
-                self.check_frame_num()
-                self.check_frame_group()
-                self.check_frame_empty()
-                self.inactive_indiv()
-                self.manual_change()
-                self.clean_plc()
-                self.check_unicity()
-                self.final_frame = self.frame
+            SCALE = 'large'
+            PRECOND = True
 
-                self._summarize_df()
+        if len(_X)<200:   # MAYBE HYPERPARAMETERS CAN BE DEFINED OTHERLY
+            DIV_ALPH = 10 # 1000
+            DIV_ALPH2 = 1000 # 1000
+            DIST = 10
+            PROM = 20 #10
+            #EP = EP
+            EP2 = EP            
+        else:
+            DIV_ALPH = 1 #10
+            DIV_ALPH2= 50
+            DIST = 50 #200
+            PROM = 3#4
+            #EP = EP
+            EP2 = EP*1
+
+        dYdX = TVRegDiff(data=_y ,itern=ITERN, 
+                        alph=ALPH/DIV_ALPH, dx=dX, 
+                        ep=EP,
+                        scale=SCALE ,
+                        plotflag=False, 
+                        precondflag=PRECOND,
+                        diffkernel=KERNEL,
+                        u0=np.append([0],np.diff(_y)),
+                        cgtol = 1e-4)    
+
+        
+        #Conversion de la pente (en g/jour) en mmol/s
+        k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+
+        #Calcul VPD en kpa (Patm = 101.325 kPa)
+        VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
+
+        #calcul gmin mmol.s
+        gmin_ = -k * df[PATM].values/VPD
+
+        #calcul gmin en mmol.m-2.s-1
+        gmin = gmin_ / df[AREA].values
+        
+        #df['gmin'] = gmin
+             
+        dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+                        alph=ALPH/DIV_ALPH2, dx=dX, 
+                        ep=EP2,
+                        scale=SCALE ,
+                        plotflag=False, 
+                        precondflag=PRECOND,
+                        diffkernel=KERNEL,
+                        u0=np.append([0],np.diff(gmin)),
+                        cgtol = 1e-4)
+     
+        ddGmin = dGmin
+        
+        peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        peaks = np.concatenate((peaks, peaks2), axis=None)
+        
+        self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+
+        
+        #####################################################################################"
+        # 
+        _ALPH = ALPH/DIV_ALPH
+        _ALPH2=ALPH/DIV_ALPH2
+        _EP=EP
+        _EP2=EP2
+
+        print('''
+            Do you want to work on keep this parameters for conductance computation ?
+
+            1: Yes or exit
+            2: No, I want to adjust regularization parameters
+            3: No, I want to select peaks manually           
+                    
+            ''') 
+
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
+        ########################################################################
+        while True:
+            if what_to_do=='1':
+                break
+            if what_to_do=='3':
+                while True:
+                    try:                        
+                        _Npoints = int(input('How many points do you want to select ? ') or 1)                
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks, manual_selection=True, Npoints=_Npoints)  
+                peaks = [str(np.round(i[0],3)) for i in sel_p]
+                #peaks = '['+peaks+']'
+
+                print('Selected points at time : ', ' '.join(map(str,peaks)))
+
+
                 print('''
-                --------------------
-                Last step
-                Do you want to save the data frame or to restart the process ?
+                        Do you want to work on keep this parameters for conductance computation ?
 
-                1. save
-                2. restart
-                ''')
+                        1: Yes or exit
+                        2: No, I want to adjust regularization parameters
+                        3: No, I want to select peaks manually       
+                             
+                        ''') 
 
-                finchoi=self._get_valid_input('What is your choice ? Choose one of : ', ('1','2'))
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
 
-        print('\n\n---------------------------------------------------------------------')
-        if self.file_or_folder== '1':
-            print('initialdir {} '.format(self.path))
-            print('initialfile {} '.format(os.path.basename(os.path.normpath(self.path))))
-            idir=self.path
-            ifile=os.path.basename(os.path.normpath(self.path))
+            if what_to_do=='2':
+                
+                print('''                
+                    Alpha : Higher values increase regularization strenght and improve conditioning         
+                    Epsilon : Parameter for avoiding division by zero smaller values give more accurate results with sharper jumps
+                    ''')
+                #while True:          
+                while True:                        
+                    try:                        
+                        _ALPH = float(input('What is the value for alpha? (current value : {}) '.format(_ALPH)) or _ALPH)
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")                  
 
-        if self.file_or_folder== '2' or self.file_or_folder== '3':
-            print('initialdir {} '.format(os.path.dirname(self.path)))
-            print('initialfile {} '.format(os.path.basename(self.path)))
-            idir=os.path.dirname(self.path)
-            ifile=os.path.basename(self.path)
+                while True:
+                    try:                        
+                        _EP= float(input('What is the value for epsilon ? (current value : {}) '.format(_EP))or _EP)
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+                while True:
+                    try:                    
+                        _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
+                while True:
+                    try:
+                        
+                        _EP2= float(input('What is the value for epsilon for the derivation? (current value : {}) '.format(_EP2))or _EP2)
+                        break
+                    except ValueError:
+                        print("Oops!  That was no valid number.  Try again...")
 
-        Tk().withdraw()
-        FileSaveName=asksaveasfilename(defaultextension='.csv', filetypes=[("csv files", '*.csv')],
-                initialdir=idir,
-                initialfile=ifile,
-                title="Choose filename")
+                dYdX = TVRegDiff(data=_y ,itern=ITERN, 
+                    alph=_ALPH, dx=dX, 
+                    ep=_EP,
+                    scale=SCALE ,
+                    plotflag=False, 
+                    precondflag=PRECOND,
+                    diffkernel=KERNEL,
+                    u0=np.append([0],np.diff(_y)),
+                    cgtol = 1e-4)    
 
-        try:
-            print('\nfile name is : {} '.format(os.path.basename(FileSaveName)))
-            print('file is saved to : {} '.format(os.path.dirname(FileSaveName)))
-        except:
-            print('no file name detected, saved to DefaultTable.csv')
-            FileSaveName = input('enter final file name : ') or 'DefaultTable'
-            FileSaveName += '.csv'
+    
+                #Conversion de la pente (en g/jour) en mmol/s
+                k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+                #Calcul VPD en kpa (Patm = 101.325 kPa)
+                VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
+                #calcul gmin mmol.s
+                gmin_ = -k * df[PATM].values/VPD
+                #calcul gmin en mmol.m-2.s-1
+                gmin = gmin_ / df[AREA].values
+                #df['raw_slope'] = dYdX
+                #df['gmin'] = gmin                     
+                dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+                                alph=_ALPH2, dx=dX, 
+                                ep=_EP2,
+                                scale=SCALE ,
+                                plotflag=False, 
+                                precondflag=PRECOND,
+                                diffkernel=KERNEL,
+                                u0=np.append([0],np.diff(gmin)),
+                                cgtol = 1e-4)
+                ddGmin = dGmin
+                peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                peaks = np.concatenate((peaks, peaks2), axis=None)
 
-        self.final_frame.to_csv(FileSaveName,index=False, header=True) #which sep ? , sep=';'
-        print('saved file {}\n'.format(FileSaveName))
+                self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+                print('''
+                    Do you want to keep this parameters for conductance computation ?
+
+                    1: Yes or exit
+                    2: No, I want to adjust regularization parameters
+                    3: Yes, but I want to select peaks manually  
+
+                    ''') 
+
+                what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
+
+        # ###################################################################################"
+        df['raw_slope'] = dYdX
+        df['gmin'] = gmin
+        
+        #df['d_gmin'] =  ['NA']+ddGmin.tolist()
+        df['d_gmin'] =  ddGmin
+
+        #print(df)
+        if len(peaks)>0:
+            try:
+                df['Peaks'] = np.array_str(_X[peaks])
+            except:                
+                df['Peaks'] = ' '.join(map(str,peaks))
+        else:
+            df['Peaks'] = 'NoPeak'
+ 
+        self.df_save.columns = df.columns
+        self.df_save = pd.concat([self.df_save, df], axis = 0, ignore_index = True)
+
+        return df
+
+    def robust_differential(self):    
+
+        print('''
+         WARNING : algorithm convergence time may be long
+        ''')
+        time.sleep(0.5)
+        self.Conductance = True
+        dimfolder = len(self.listOfFiles)
+        li_all = []
+        self.df_save = pd.DataFrame(columns = range(0,16))
+        for d in np.arange(0,dimfolder):
+            print('\n\n\n---------------------------------------------------------------------')
+            print(d)
+            li = []
+            try:
+                self.presentfile=self.listOfFiles[d][0]
+            except:
+                self.presentfile = 'No file'
+            
+            print('parsing list of files from : {}'.format(self.presentfile))
+            if self.presentfile != 'No file':
+                for elem in self.listOfFiles[d]:
+                    dffile = self._robust_import(elem)
+                    self._parse_samples(dffile = dffile, FUNC = self._tvregdiff)
+        
+        self.df_save.to_csv('gmin.csv')
+                    #dfe = 
+                    # df_save.columns = dfe.columns
+                    # df_save = pd.concat([df_save, dfe], axis = 0, ignore_index = True)
+                    # df_save.to_csv('gmin.csv')
+
+  
+
+
+            
