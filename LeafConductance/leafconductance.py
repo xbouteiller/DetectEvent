@@ -402,7 +402,7 @@ class ParseTreeFolder():
 
         if len(Xidx)==1:
             slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
-            ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+            ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
         else:
             print('more than 1 crossing point were detected')
 
@@ -493,9 +493,9 @@ class ParseTreeFolder():
 
                 else:                    
                     if _Npoints==1:                       
-                        ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+                        ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
                     elif _Npoints==2:                        
-                        ax1.plot(Xreg, fitted_values, c = colors['goldenrod'], lw = 2)
+                        ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
                     else:
                         print('unable to fit regression')
                 
@@ -527,19 +527,23 @@ class ParseTreeFolder():
         else:
              _y = df[COL_Y].copy().values
 
+        #print(df.head())
+        #input()
+
         if self.df_value is None:
             self.df_value = pd.DataFrame(columns = df.columns)
         
-        self.df_value = pd.concat([self.df_rmse, df], axis = 0, ignore_index = True)
+        self.df_value = pd.concat([self.df_value, df], axis = 0, ignore_index = True)
 
 
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
 
         if self.df_rmse is None:
-            self.df_rmse = pd.DataFrame(columns = ['Sample', 'score_lin', 'Start_lin', 'score_exp', 'Start_exp'])        
-        df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'score_lin':score_l, 'Start_lin':mean_start_l, 'score_exp':score_e, 'Start_exp':mean_start_e]})        
-        self.df_rmse = pd.concat([self.df_temp_rmse, df], axis = 0, ignore_index = True)
+            self.df_rmse = pd.DataFrame(columns = ['Sample', 'RMSE_lin', 'Time_lin', 'RMSE_exp', 'Time_exp'])        
+        
+        df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
+        self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
   
         idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
 
@@ -587,6 +591,10 @@ class ParseTreeFolder():
             #print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
+            df['raw_data'] = df[YVAR].copy()
+            df['smooth_data'] = self.Ysmooth.copy()
+            df['Work_on_smooth'] = 'No'
+
             if not self.Conductance:  
                 plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
                 plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
@@ -609,6 +617,7 @@ class ParseTreeFolder():
                 ########################################################################
                 if what_to_do=='1':
                     df[YVAR] = self.Ysmooth.copy()
+                    df['Work_on_smooth'] = 'yes'
                 if what_to_do=='2':
                     while True:          
                         while True:
@@ -649,9 +658,9 @@ class ParseTreeFolder():
                             break
                         if what_to_do == '2':
                             pass
-                    df['raw_data'] = df[YVAR].copy()
-                    df['smooth_data'] = self.Ysmooth.copy()
+                    
                     df[YVAR] = self.Ysmooth.copy()
+                    df['Work_on_smooth'] = 'yes'
         
             FUNC(df)
             #return dfe
@@ -695,14 +704,17 @@ class ParseTreeFolder():
             self.df_rmse = None
             self.df_value = None
             print('parsing list of files from : {}'.format(self.presentfile))
+            if not os.path.exists('output_files'):
+                os.makedirs('output_files')
+
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)                    
                     
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
-                    pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem)))
-                    self.df_rmse.to_csv('RMSE_score_'+str(os.path.basename(elem)))
-                    self.df_value.to_csv('df_complete_'+str(os.path.basename(elem)))
+                    pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('output_files/RMSE_detection_'+str(os.path.basename(elem)))
+                    self.df_rmse.to_csv('output_files/RMSE_score_'+str(os.path.basename(elem)))
+                    self.df_value.to_csv('output_files/RMSE_df_complete_'+str(os.path.basename(elem)))
                     self.df_rmse = None
                     self.df_value = None
                     self.global_score = []
@@ -1007,7 +1019,9 @@ class ParseTreeFolder():
                     dffile = self._robust_import(elem)
                     self._parse_samples(dffile = dffile, FUNC = self._tvregdiff)
         
-        self.df_save.to_csv('gmin.csv')
+        if not os.path.exists('output_files'):
+                os.makedirs('output_files')
+        self.df_save.to_csv('output_files/gmin.csv')
                     #dfe = 
                     # df_save.columns = dfe.columns
                     # df_save = pd.concat([df_save, dfe], axis = 0, ignore_index = True)

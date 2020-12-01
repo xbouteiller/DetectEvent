@@ -7,7 +7,7 @@ if __name__=="__main__":
 
     from LeafConductance.leafconductance import ParseFile, ParseTreeFolder
 
-    root = os.getcwd()
+
 
     parse_folder = ParseTreeFolder()
     parse_folder.parse_folder()
