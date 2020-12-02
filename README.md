@@ -73,7 +73,13 @@ For a better files recognition, first row of the csv file should contain the str
 Columns should be named as indicated below
 
 
-#### Quantitative columnd
+#### Quantitative columns
+
+- weight_g : leaf weight as a function of time (g)
+- T_C : temperature (°C)
+- RH : 
+- Patm : atmospheric pressure (KPa)
+- Area_m2 : area of the leaf (m2)
 
 #### Qualitative columns
 
