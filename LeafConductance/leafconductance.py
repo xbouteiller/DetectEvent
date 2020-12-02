@@ -53,7 +53,7 @@ ITERN=4000
 ALPH=1000
 EP=1e-9
 KERNEL='abs'#'abs'
-THRES = 10 #3
+THRES = 50 #3
 
 class ParseFile():
     import pandas as pd
@@ -124,21 +124,23 @@ class ParseTreeFolder():
         # self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
         if self.file_or_folder== '1':
             ################################################### REACTIVATE
-            #Tk().withdraw()
-            #folder = askdirectory(title='What is the root folder that you want to parse ?')
-            folder = '/home/xavier/Documents/development/DetectEvent/data'
+            root_path = os.getcwd()
+            Tk().withdraw()
+            folder = askdirectory(title = 'What is the root folder that you want to parse ?',
+                                  initialdir = root_path)
+            #folder = '/home/xavier/Documents/development/DetectEvent/data'
             #####################################################""
             self.path = folder
             print('\n\n\nroot path is {}'.format(self.path))
             ################################################### REACTIVATE
-            # print('''
-            # which method do you want to use for detecting cavisoft files ?
+            print('''
+            which method do you want to use for detecting conductance files ?
 
-            # 1: Detect all CSV files 
-            # 2: Detect string 'CONDUCTANCE' string in the first row
-            # ''')
-            # self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-            self.method_choice = '2' 
+            1: Detect all CSV files 
+            2: Detect string 'CONDUCTANCE' in the first row
+            ''')
+            self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+            #self.method_choice = '2' 
             ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
 
@@ -255,7 +257,7 @@ class ParseTreeFolder():
         """)
 
     def _quit(self):
-        print("Thank you for using your LeafConductance today.")
+        print("Thank you for using your LeafConductance today.\n")
         sys.exit(0)
 
     def run(self):
@@ -373,7 +375,31 @@ class ParseTreeFolder():
 
         return slope, intercept, rsquared, fitted_values, X
 
-    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe):
+    def _compute_gmin_mean(self, df, slope, t1, t2 = None):
+        
+        if t2 is None:
+            df = df[df['delta_time']>= t1].copy()
+        if t2 is not None:            
+            df = df[(df['delta_time']>= t1) & (df['delta_time']<= t2)].copy()
+
+        k= (slope/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+
+        #Calcul VPD en kpa (Patm = 101.325 kPa)
+        VPD =0.1*((6.13753*np.exp((17.966*np.mean(df[T].values)/(np.mean(df[T].values)+247.15)))) - (np.mean(df[RH].values)/100*(6.13753*np.exp((17.966*np.mean(df[T].values)/(np.mean(df[T].values)+247.15)))))) 
+
+        #calcul gmin mmol.s
+        gmin_ = -k * np.mean(df[PATM].values)/VPD
+
+        #calcul gmin en mmol.m-2.s-1
+        gmin = gmin_ / np.mean(df[AREA].values)
+
+        print('gmin_mean: ', gmin)
+
+        return gmin, [k, VPD, np.mean(df[T].values), np.mean(df[RH].values), np.mean(df[PATM].values), np.mean(df[AREA].values)]
+
+
+
+    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe, df):
         Ylin=np.array(Ylin)
         Yexp=np.array(Yexp)
         Xl=np.array(Xl)  
@@ -403,6 +429,7 @@ class ParseTreeFolder():
         if len(Xidx)==1:
             slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
             ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
+            gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=Xidx[0], t2 = None)
         else:
             print('more than 1 crossing point were detected')
 
@@ -442,9 +469,9 @@ class ParseTreeFolder():
         what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
 
         if what_to_do=='2':
-            self.global_score.append([self.sample,'Discarded'])
+            self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded'])
         if what_to_do=='1':
-            self.global_score.append([self.sample, Xidx, slope, rsquared])
+            self.global_score.append([self.sample, Xidx, slope, rsquared, gmin_mean, list_of_param])
         if what_to_do=='3':
             while True:
                 try:                        
@@ -485,9 +512,11 @@ class ParseTreeFolder():
                 if First_pass == 0:
                     selected_points = fig.ginput(_Npoints)
                     if _Npoints==1:
-                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=selected_points[0])                       
+                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=selected_points[0])
+                        gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = None)                       
                     elif _Npoints==2:
-                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(selected_points[0], True, selected_points[1],)                        
+                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(selected_points[0], True, selected_points[1]) 
+                        gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = selected_points[1][0])                         
                     else:
                         print('unable to fit regression')
 
@@ -506,7 +535,7 @@ class ParseTreeFolder():
            
             print('\nSelected points at time : ', ' '.join([str(i[0]) for i in selected_points ]))
             print('\n')
-            self.global_score.append([self.sample, [i[0] for i in selected_points ], slope, rsquared])  
+            self.global_score.append([self.sample, [i[0] for i in selected_points ], slope, rsquared, gmin_mean, list_of_param])  
 
 
         print('gs',self.global_score)
@@ -545,10 +574,10 @@ class ParseTreeFolder():
         df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
   
-        idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e) #Yexp, Ylin, Xl, Xe
+        idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
 
 
-        
+
 
     def _smoother(self, ex, end, fr, delta_multi):
         delt = delta_multi * ex.shape[0]
@@ -627,7 +656,7 @@ class ParseTreeFolder():
                             
                             try:
                                 _FRAC=0.1
-                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)))
+                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)) or FRAC_P2)
                                 _FRAC = FRAC_P2
                                 break
                             except ValueError:
@@ -636,7 +665,7 @@ class ParseTreeFolder():
 
                             try:
                                 _DELTA_MULTI=0.01
-                                DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)))
+                                DELTA_MULTI2= float(input('What is the delta value ? (current value : {}) '.format(_DELTA_MULTI)) or _DELTA_MULTI)
                                 _DELTA_MULTI = DELTA_MULTI2
                                 break
                             except ValueError:
@@ -715,7 +744,13 @@ class ParseTreeFolder():
                     dffile = self._robust_import(elem)                    
                     
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
-                    pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('output_files/RMSE_detection_'+str(os.path.basename(elem)))
+                    temp_df = pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared', 'Gmin_mean', 'pack'])
+                    temp_df2 = pd.DataFrame(temp_df["pack"].to_list(), columns=['K', 'VPD', 'mean_T', 'mean_RH', 'mean_Patm', 'mean_area'])
+                    temp_df = temp_df.drop(columns='pack')
+
+                    pd.concat([temp_df,temp_df2], axis = 1).to_csv('output_files/RMSE_detection_'+str(os.path.basename(elem)))                   
+                    
+                    
                     self.df_rmse.to_csv('output_files/RMSE_score_'+str(os.path.basename(elem)))
                     self.df_value.to_csv('output_files/RMSE_df_complete_'+str(os.path.basename(elem)))
                     self.df_rmse = None
