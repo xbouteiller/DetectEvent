@@ -51,7 +51,7 @@ Then open a terminal
 
 ## Program possibilities
 
-### RMSE approach
+#### RMSE approach
 
 - Objective is to detect curve's changing point (i.e the point where the curve shift from an exponential function to a linear function)
 - Exponential function is fitted from left to right and linear function is fitted from right to left
@@ -59,7 +59,7 @@ Then open a terminal
 - Several computed parameters are extracted and saved within a csv file (as Gmin)
 
 
-### Robust differential method
+#### Robust differential method
 
 - Use a robust differential method (Chartrand, 2011) to compute conductance from raw data 
 - Conductance is further differentiated in order to detect peak
@@ -91,7 +91,8 @@ Columns should be named as indicated below
 
 - date_time : time of the experiment (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
 
-## References
+
+## References
 
 
 > Chartrand, Rick. (2011). Numerical Differentiation of Noisy, Nonsmooth Data. ISRN Appl. Math.. 2011. 10.5402/2011/164564. 
