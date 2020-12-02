@@ -83,6 +83,12 @@ Columns should be named as indicated below
 
 #### Qualitative columns
 
+- weight_g : leaf weight as a function of time (g)
+- T_C : temperature (°C)
+- RH : 
+- Patm : atmospheric pressure (KPa)
+- Area_m2 : area of the leaf (m2)
+
 
 
 ## Data
