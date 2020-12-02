@@ -1,4 +1,4 @@
-# Python Program for computing leaf conductance and detecting curve's change
+# Python Program for computing leaf conductance and detecting curve's changing point
 
 
 ## Install Python version if needed
@@ -96,5 +96,7 @@ Columns should be named as indicated below
 
 
 > Chartrand, Rick. (2011). Numerical Differentiation of Noisy, Nonsmooth Data. ISRN Appl. Math.. 2011. 10.5402/2011/164564. 
+
 [Original paper](https://www.hindawi.com/journals/isrn/2011/164564/)
+
 [GitHub](https://github.com/xbouteiller/tvregdiff)
