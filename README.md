@@ -4,6 +4,7 @@
 ## Install Python version if needed
 
 [Anaconda](https://www.anaconda.com/products/individual)
+
 [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
 
@@ -57,6 +58,7 @@ Then open a terminal
 - Root Mean Squared Error (RMSE) is computed and it is excpected that errors cross  approximately at he curve's changing point
 - Several computed parameters are extracted and saved within a csv file (as Gmin)
 
+
 ### Robust differential method
 
 - Use a robust differential method (Chartrand, 2011) to compute conductance from raw data 
@@ -70,12 +72,14 @@ For a better files recognition, first row of the csv file should contain the str
 
 Columns name should be as below
 
+
 ### Quantitative columns 
 - weight_g : leaf weight as a function of time (g)
 - T_C : temperature (°C)
 - RH : 
 - Patm : atmospheric pressure (KPa)
 - Area_m2 : area of the leaf (m2)
+
 
 ### Qualitative columns 
 - campaign : campaign name
@@ -86,7 +90,9 @@ Columns name should be as below
 - date_time : time of the experiment (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
 
 
+
 ## References
+
 
 > Chartrand, Rick. (2011). Numerical Differentiation of Noisy, Nonsmooth Data. ISRN Appl. Math.. 2011. 10.5402/2011/164564. 
 [Original paper](https://www.hindawi.com/journals/isrn/2011/164564/)
