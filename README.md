@@ -73,7 +73,7 @@ For a better files recognition, first row of the csv file should contain the str
 Columns should be named as indicated below
 
 
-### Quantitative columns 
+#### Quantitative columns 
 
 - weight_g : leaf weight as a function of time (g)
 - T_C : temperature (°C)
@@ -82,7 +82,7 @@ Columns should be named as indicated below
 - Area_m2 : area of the leaf (m2)
 
 
-### Qualitative columns 
+#### Qualitative columns 
 
 - campaign : campaign name
 - sample_ID : name of the sample (several samples can be in the same csv file)
