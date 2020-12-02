@@ -128,7 +128,7 @@ class ParseTreeFolder():
             Tk().withdraw()
             folder = askdirectory(title = 'What is the root folder that you want to parse ?',
                                   initialdir = root_path)
-            #folder = '/home/xavier/Documents/development/DetectEvent/data'
+            # folder = '/home/xavier/Documents/development/DetectEvent/data'
             #####################################################""
             self.path = folder
             print('\n\n\nroot path is {}'.format(self.path))
@@ -140,7 +140,7 @@ class ParseTreeFolder():
             2: Detect string 'CONDUCTANCE' in the first row
             ''')
             self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
-            #self.method_choice = '2' 
+            # self.method_choice = '2' 
             ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
 
@@ -314,14 +314,14 @@ class ParseTreeFolder():
             mean_start = X[start]
             if BOUND == 'NotSet':
                 try:
-                    reg = self._detect_b( X[lag:lag+(window*4)], y[lag:lag+(window*4)], mode)
+                    reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
                     Aa, Bb = reg                     
-                    bound = ([Aa-0.5*Aa,Bb/100],[Aa+0.5*Aa, Bb*100])
+                    bound = ([Aa-0.015*Aa,Bb/1.05],[Aa+0.015*Aa, Bb*1.05])
                 except:
                     bound = ([0,1/1000000],[100, 1/100])
             else:
                 bound=BOUND
-
+            print('bound : ', bound)
             try:
                 score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
                         for s in start]
@@ -400,6 +400,9 @@ class ParseTreeFolder():
 
 
     def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe, df):
+        gmin_mean=''
+        list_of_param=['', '', '', '', '', '']
+
         Ylin=np.array(Ylin)
         Yexp=np.array(Yexp)
         Xl=np.array(Xl)  
@@ -573,10 +576,12 @@ class ParseTreeFolder():
         
         df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
-  
-        idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
 
-
+        try:
+            idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
+        except:
+            print('detect crossing failed, probable cause is that more than 1 crossing were detected')
+            self.global_score.append([self.sample, 'Failed', 'Failed', 'Failed', 'Failed', ['', '', '', '', '', '']])
 
 
     def _smoother(self, ex, end, fr, delta_multi):
@@ -1041,7 +1046,7 @@ class ParseTreeFolder():
         self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
-        self.df_save = pd.DataFrame(columns = range(0,16))
+        self.df_save = pd.DataFrame(columns = range(0,19))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
