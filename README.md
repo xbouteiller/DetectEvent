@@ -70,7 +70,7 @@ Then open a terminal
 Data must be stored within files
 For a better files recognition, first row of the csv file should contain the string conductance otherwise all csv from a folder will be parsed
 
-Columns should be named as indicated below
+Columns should be named as follow
 
 
 #### Quantitative columns
@@ -91,31 +91,7 @@ Columns should be named as indicated below
 
 #### Date
 
-- date_time : time of the experiment (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
-
-## Data
-
-Data must be stored within files
-For a better files recognition, first row of the csv file should contain the string conductance otherwise all csv from a folder will be parsed
-
-Columns should be named as indicated below
-
-#### Quantitative columns 
-
-- weight_g : leaf weight as a function of time (g)
-- T_C : temperature (°C)
-- RH : 
-- Patm : atmospheric pressure (KPa)
-- Area_m2 : area of the leaf (m2)
-
-#### Qualitative columns 
-
-- campaign : campaign name
-- sample_ID : name of the sample (several samples can be in the same csv file)
-
-### Date
-
-- date_time : time of the experiment (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
+- date_time : time (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
 
 
 ## References
