@@ -55,7 +55,7 @@ Then open a terminal
 
 - Objective is to detect curve's changing point (i.e the point where the curve shift from an exponential function to a linear function)
 - Exponential function is fitted from left to right and linear function is fitted from right to left
-- Root Mean Squared Error (RMSE) is computed and it is excpected that errors cross  approximately at he curve's changing point
+- Root Mean Squared Error (RMSE) is computed and it is expected that the 2 errors cross  approximately at the curve's changing point
 - Several computed parameters are extracted and saved within a csv file (as Gmin)
 
 
