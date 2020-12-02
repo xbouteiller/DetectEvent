@@ -89,7 +89,9 @@ Columns should be named as indicated below
 - Patm : atmospheric pressure (KPa)
 - Area_m2 : area of the leaf (m2)
 
+#### Date
 
+- date_time : time of the experiment (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
 
 ## Data
 
