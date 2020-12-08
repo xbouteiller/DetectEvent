@@ -581,6 +581,10 @@ class ParseTreeFolder():
             idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
         except:
             print('detect crossing failed, probable cause is that more than 1 crossing were detected')
+            try:
+                plt.close()
+            except:
+                pass
             self.global_score.append([self.sample, 'Failed', 'Failed', 'Failed', 'Failed', ['', '', '', '', '', '']])
 
 
