@@ -49,6 +49,13 @@ Then open a terminal
 > python Leaf_exec.py
 >
 
+## Installing updates
+
+>
+> git pull origin main
+> python setup.py develop
+>
+
 ## Program possibilities
 
 #### RMSE approach
@@ -77,17 +84,14 @@ Columns should be named as follow
 
 - weight_g : leaf weight as a function of time (g)
 - T_C : temperature (°C)
-- RH : 
+- RH : Realtive Humidity
 - Patm : atmospheric pressure (KPa)
 - Area_m2 : area of the leaf (m2)
 
 #### Qualitative columns
 
-- weight_g : leaf weight as a function of time (g)
-- T_C : temperature (°C)
-- RH : 
-- Patm : atmospheric pressure (KPa)
-- Area_m2 : area of the leaf (m2)
+- campaign : campaign name
+- sample_ID : ID of the sample, should be unique for each sample
 
 #### Date
 
