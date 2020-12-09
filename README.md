@@ -53,6 +53,7 @@ Then open a terminal
 
 >
 > git pull origin main
+>
 > python setup.py develop
 >
 
@@ -84,7 +85,7 @@ Columns should be named as follow
 
 - weight_g : leaf weight as a function of time (g)
 - T_C : temperature (°C)
-- RH : Realtive Humidity
+- RH : Relative Humidity
 - Patm : atmospheric pressure (KPa)
 - Area_m2 : area of the leaf (m2)
 
