@@ -76,7 +76,7 @@ Then open a terminal
 ## Data
 
 Data must be stored within files
-For a better files recognition, first row of the csv file should contain the string conductance otherwise all csv from a folder will be parsed
+For a better files recognition, first row of the csv file should contain the string "conductance" otherwise all csv from a folder will be parsed
 
 Columns should be named as follow
 
