@@ -230,7 +230,7 @@ class ParseTreeFolder():
                 print('no files detected at all')
                 pass
 
-            time.sleep(4)
+            time.sleep(1)
 
             return self.listOfFiles
 
@@ -493,7 +493,7 @@ class ParseTreeFolder():
             what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
 
         if what_to_do=='2':
-            self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded'])
+            self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded', ['', '', '', '', '', '']])
         if what_to_do=='1':
             self.global_score.append([self.sample, Xidx, slope, rsquared, gmin_mean, list_of_param])
         if what_to_do=='3':
