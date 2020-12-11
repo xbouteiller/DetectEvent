@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V0.2              ---------------------')
+print('---------------                  V0.3              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -31,7 +31,7 @@ num_col = ['weight_g','T_C','RH', 'Patm', 'Area_m2']
 group_col=['campaign', 'sample_ID', 'Treatment', 'Operator']
 date=['date_time']
 
-
+# error_proof
 # GLOBAL VARIABLES
 SEP = ','
 TIME_COL = 'date_time'
@@ -326,8 +326,8 @@ class ParseTreeFolder():
                 score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
                         for s in start]
             except:
-                raise Exception('Failed to fit Exponential curve')
-
+                #raise Exception('Failed to fit Exponential curve')
+                print('Failed to fit Exponential curve')
         score = self._min_max(score)
         #print('{} score'.format(mode), score)
         return score, mean_start
@@ -409,10 +409,17 @@ class ParseTreeFolder():
         Xe=np.array(Xe) 
         idx = self._dcross(Ylin[::-1], Yexp)
         Xidx=Xe[idx]    
+
+        #print('Xidx : ', Xidx)
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
 
-        Yidx=self.Ysmooth[self.Xselected == Xidx]
+        if len(Xidx)==1:
+            Yidx=self.Ysmooth[self.Xselected == Xidx]
+        else:
+            a = []
+            [a.append(self.Ysmooth[self.Xselected == i]) for i in Xidx]
+            Yidx = a
 
         
         fig, ax1 = plt.subplots()
@@ -424,7 +431,10 @@ class ParseTreeFolder():
         ax1.tick_params(axis='y', labelcolor=color)
         color = 'tab:red'
         ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+        
+       
         ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+
         ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
         ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
         ax1.legend(loc='upper right')
@@ -462,14 +472,25 @@ class ParseTreeFolder():
         for i in np.arange(0,len(idx)):
             print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
         
-        print('''
-            Do you want to keep the crossing value ?
 
-            1: Yes, save
-            2: No, discard
-            3. Select values manually on graph
-            ''')
-        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
+        if len(Xidx)>1:           
+            print('''
+                    More than 1 crossing point were detected, you have to chose between :
+                    
+                    2: No, discard
+                    3. Select values manually on graph
+                    ''')                
+            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('2','3'))
+                
+        else :
+            print('''
+                Do you want to keep the crossing value ?
+
+                1: Yes, save
+                2: No, discard
+                3. Select values manually on graph
+                ''')
+            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
 
         if what_to_do=='2':
             self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded'])
@@ -571,12 +592,14 @@ class ParseTreeFolder():
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
 
+        # print(score_l, mean_start_l, score_e, mean_start_e )
+
         if self.df_rmse is None:
             self.df_rmse = pd.DataFrame(columns = ['Sample', 'RMSE_lin', 'Time_lin', 'RMSE_exp', 'Time_exp'])        
         
         df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
-
+        
         try:
             idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
         except:
