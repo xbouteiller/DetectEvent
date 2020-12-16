@@ -328,6 +328,7 @@ class ParseTreeFolder():
             except:
                 #raise Exception('Failed to fit Exponential curve')
                 print('Failed to fit Exponential curve')
+                score = np.repeat(1, len(start))
         score = self._min_max(score)
         #print('{} score'.format(mode), score)
         return score, mean_start
