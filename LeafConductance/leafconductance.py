@@ -330,6 +330,7 @@ class ParseTreeFolder():
 
                 print('\n+++++++++++++++++++++++++++++++++++')
                 print('  Failed to fit Exponential curve  ')
+                print('     You should discard values  ')
                 print('+++++++++++++++++++++++++++++++++++\n')
                 time.sleep(1)
                 score = np.repeat(1, len(start))
@@ -807,6 +808,7 @@ class ParseTreeFolder():
                     self.global_score = []
 
             pd.concat(list_of_df).reset_index().explode('Change_points').to_csv('output_files/'+'RMSE_df_complete_full.csv')
+            pd.concat(list_of_df).reset_index().explode('Change_points').drop_duplicates(subset=['Campaign','index','Sample_ID','slope']).to_csv('output_files/'+'RMSE_df_complete_full_No_duplicates.csv')
 
             # pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
             # self.df_rmse.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
