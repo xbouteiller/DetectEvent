@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V0.3              ---------------------')
+print('---------------                  V0.4              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -423,6 +423,7 @@ class ParseTreeFolder():
 
         
         fig, ax1 = plt.subplots()
+        plt.title(self.sample)
 
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
@@ -507,7 +508,7 @@ class ParseTreeFolder():
             First_pass = 0
             while First_pass < 2:
                 fig, ax1 = plt.subplots()
-
+                plt.title(self.sample)
                 color = 'tab:blue'
                 ax1.set_xlabel('time (min)')
                 ax1.set_ylabel(self.sample, color=color)
@@ -662,6 +663,8 @@ class ParseTreeFolder():
             if not self.Conductance:  
                 plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
                 plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
+                plt.title(self.sample)
+                plt.ylabel(self.sample)
                 plt.legend()    
                 # plt.pause(PAUSE_GRAPH/10)
                 plt.waitforbuttonpress(0)
@@ -771,6 +774,8 @@ class ParseTreeFolder():
             if not os.path.exists('output_files'):
                 os.makedirs('output_files')
 
+            list_of_df = []
+
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)                    
@@ -779,15 +784,24 @@ class ParseTreeFolder():
                     temp_df = pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared', 'Gmin_mean', 'pack'])
                     temp_df2 = pd.DataFrame(temp_df["pack"].to_list(), columns=['K', 'VPD', 'mean_T', 'mean_RH', 'mean_Patm', 'mean_area'])
                     temp_df = temp_df.drop(columns='pack')
+                    
+                    temp_folder = os.path.splitext(str(os.path.basename(elem)))[0]
 
-                    pd.concat([temp_df,temp_df2], axis = 1).to_csv('output_files/RMSE_detection_'+str(os.path.basename(elem)))                   
-                    
-                    
-                    self.df_rmse.to_csv('output_files/RMSE_score_'+str(os.path.basename(elem)))
-                    self.df_value.to_csv('output_files/RMSE_df_complete_'+str(os.path.basename(elem)))
+                    if not os.path.exists('output_files/' + temp_folder ):
+                        os.makedirs('output_files/' + temp_folder) 
+                    temp_df = pd.concat([temp_df,temp_df2], axis = 1)
+                    temp_df['Campaign'] = temp_folder
+                    list_of_df.append(temp_df)
+                    temp_df.to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem))) 
+                    #pd.concat([temp_df,temp_df2], axis = 1).to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem)))                 
+                                        
+                    self.df_rmse.to_csv('output_files/'+ temp_folder + '/RMSE_score_'+str(os.path.basename(elem)))
+                    self.df_value.to_csv('output_files/'+ temp_folder + '/RMSE_df_complete_'+str(os.path.basename(elem)))
                     self.df_rmse = None
                     self.df_value = None
                     self.global_score = []
+
+            pd.concat(list_of_df).reset_index().explode('Change_points').to_csv('output_files/'+'RMSE_df_complete_full.csv')
 
             # pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
             # self.df_rmse.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
@@ -799,6 +813,7 @@ class ParseTreeFolder():
     def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' , manual_selection=False, Npoints=1):
         
         fig, ax1 = plt.subplots()
+        plt.title(self.sample)
         color = 'tab:blue'
         ax1.set_xlabel('time (min)')
         ax1.set_ylabel(self.sample + '\nWeight (g)', color=color)

@@ -3,7 +3,7 @@ from setuptools import setup
 
 # Create proper setup to be used by pip
 setup(name='LeafConductance',
-      version='0.3',
+      version='0.4',
       description='Detect changes in curve',
       author='Xavier Bouteiller',
       author_email='xavier.bouteiller@u-bordeaux.fr',
