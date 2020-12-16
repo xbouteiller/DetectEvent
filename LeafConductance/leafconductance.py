@@ -327,7 +327,11 @@ class ParseTreeFolder():
                         for s in start]
             except:
                 #raise Exception('Failed to fit Exponential curve')
-                print('Failed to fit Exponential curve')
+
+                print('\n+++++++++++++++++++++++++++++++++++')
+                print('  Failed to fit Exponential curve  ')
+                print('+++++++++++++++++++++++++++++++++++\n')
+                time.sleep(1)
                 score = np.repeat(1, len(start))
         score = self._min_max(score)
         #print('{} score'.format(mode), score)
