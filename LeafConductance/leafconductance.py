@@ -49,10 +49,10 @@ FRAC_P = 0.1
 DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
 
-ITERN=4000
+ITERN=10000
 ALPH=1000
-EP=1e-9
-KERNEL='abs'#'abs'
+EP=1e-6
+KERNEL='abs'#'sq'#abs'#'abs'
 THRES = 50 #3
 
 class ParseFile():
@@ -866,6 +866,30 @@ class ParseTreeFolder():
             return selected_points
     
     
+    def _compute_gmin(self, df, slope):                
+
+        k= (slope/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
+
+        #Calcul VPD en kpa (Patm = 101.325 kPa)
+        VPD =0.1*((6.13753*np.exp((17.966*(df[T].values)/((df[T].values)+247.15)))) - ((df[RH].values)/100*(6.13753*np.exp((17.966*(df[T].values)/((df[T].values)+247.15)))))) 
+
+        #calcul gmin mmol.s
+        gmin_ = -k * (df[PATM].values)/VPD
+
+        #calcul gmin en mmol.m-2.s-1
+        gmin = gmin_ / (df[AREA].values)
+
+        #print('gmin : ', gmin)
+        try:
+            print('gmin mean last 100 values: ', np.mean(gmin[-100:]))
+        except:
+            print('gmin mean last 10 values: ', np.mean(gmin[-10:]))
+        try:
+            print('slope mean last 100 values: ', np.mean(slope[-100:]))
+        except:
+            print('slope mean last 10 values: ', np.mean(slope[-10:]))
+        return gmin, k, VPD
+
     def _tvregdiff(self,df):
 
         _X = df['delta_time'].copy().values
@@ -902,21 +926,9 @@ class ParseTreeFolder():
                         precondflag=PRECOND,
                         diffkernel=KERNEL,
                         u0=np.append([0],np.diff(_y)),
-                        cgtol = 1e-4)    
+                        cgtol = 1e-4)   
 
-        
-        #Conversion de la pente (en g/jour) en mmol/s
-        k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
-
-        #Calcul VPD en kpa (Patm = 101.325 kPa)
-        VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
-
-        #calcul gmin mmol.s
-        gmin_ = -k * df[PATM].values/VPD
-
-        #calcul gmin en mmol.m-2.s-1
-        gmin = gmin_ / df[AREA].values
-        
+        gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
         #df['gmin'] = gmin
              
         dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
@@ -1026,19 +1038,10 @@ class ParseTreeFolder():
                     precondflag=PRECOND,
                     diffkernel=KERNEL,
                     u0=np.append([0],np.diff(_y)),
-                    cgtol = 1e-4)    
-
-    
-                #Conversion de la pente (en g/jour) en mmol/s
-                k= (dYdX/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
-                #Calcul VPD en kpa (Patm = 101.325 kPa)
-                VPD =0.1*((6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))) - (df[RH].values/100*(6.13753*np.exp((17.966*df[T].values/(df[T].values+247.15)))))) 
-                #calcul gmin mmol.s
-                gmin_ = -k * df[PATM].values/VPD
-                #calcul gmin en mmol.m-2.s-1
-                gmin = gmin_ / df[AREA].values
-                #df['raw_slope'] = dYdX
-                #df['gmin'] = gmin                     
+                    cgtol = 1e-4)        
+       
+                gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
+         
                 dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
                                 alph=_ALPH2, dx=dX, 
                                 ep=_EP2,
