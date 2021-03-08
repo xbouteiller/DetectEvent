@@ -583,7 +583,7 @@ class ParseTreeFolder():
             while True:
                 try:
                     # future allow only selection of 1 or 2 points                        
-                    _Npoints = int(input('How many points do you want to select ? ') or 1)                
+                    _Npoints = int(self._get_valid_input('How many points do you want to select ? ',('1', '2')) or 1)              
                     break
                 except ValueError:
                     print("Oops!  That was no valid number.  Try again...")
@@ -1104,7 +1104,7 @@ class ParseTreeFolder():
             if what_to_do=='3':
                 while True:
                     try:                        
-                        _Npoints = int(input('How many points do you want to select ? ') or 1)                
+                        _Npoints = int(self._get_valid_input('How many points do you want to select ? ',('1', '2')) or 1)                
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
