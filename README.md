@@ -1,6 +1,11 @@
 # Python Program for computing leaf conductance and detecting curve's changing point
 
 
+Current version is: **0.5**
+
+<img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
+
+
 ## Install Python version if needed
 
 [Anaconda](https://www.anaconda.com/products/individual)
@@ -97,6 +102,44 @@ Columns should be named as follow
 #### Date
 
 - date_time : time (best with the format YEAR/MONTH/DAY HOUR:MINUTE )
+
+
+## Program flow
+
+
+#### Step 1
+1. The program ask to chose a folder that will be parsed 
+<img src="img/2021-03-08_15-41_1.png" width="75%" height="75%">
+
+#### Step 2
+2. A method for detecting conductancefiles must be chosen. There is two possibilities : either the program detect all .csv file or the program detect files containing the string "conductance" in the first row. Number of detected files within folder will be printed in the console.
+<img src="img/2021-03-08_15-42.png" width="75%" height="75%">
+
+### Step 3
+3. You have to chose which method you will use: either the RMSE approach or the robust differential approach
+<img src="img/2021-03-08_15-42_1.png" width="75%" height="75%">
+
+The following steps are for the RMSE approach
+#### Step 4
+4. The software proposes to work on raw data or smoothed data. It is often preferable to work on smoothed data.
+<img src="img/2021-03-08_15-43.png" width="75%" height="75%">
+Smoothing parameters can be adjusted. See th lowess method from the statsmodels library. [lowess help](https://www.statsmodels.org/stable/generated/statsmodels.nonparametric.smoothers_lowess.lowess.html)
+<img src="img/2021-03-08_15-44.png" width="75%" height="75%">
+
+#### Step 5
+5. The program plot the detected crossing points, and print the value in the console.
+<img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
+Gmin is computed using a linear regression from the detected crossing point to the end of the data.
+<img src="img/2021-03-08_16-21.png" width="75%" height="75%">
+It is also possible to select manually on the graph 1 or 2 crossing points. if 2 points are selected, Gmin is computed between this 2 points. See the black line below.
+<img src="img/2021-03-08_15-45.png" width="75%" height="75%">
+
+
+#### Step 6
+6. Other files & sample ID within each file are analyzed, then a output folder is created & a data frame is saved within this folder.
+
+For the conductance approach. Step are very similar. It is also possible to work on raw or smoothed data. It is possbile to adjust the regularization parameters of the derivative function (see cited reference below). Then, peaks are detected, it is also possible to select the peaks manually. Please note that this method is still under development.
+
 
 
 ## References

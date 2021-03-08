@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V0.4              ---------------------')
+print('---------------                  V0.5              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -82,6 +82,8 @@ class ParseFile():
     def clean_file(self):
         '''
         clean the file
+
+        Currently do nothing but can be adapted in order to clean file individually
         '''
         import re
         import pandas as pd
@@ -96,6 +98,12 @@ class ParseTreeFolder():
 
 
     def _get_valid_input(self, input_string, valid_options):
+        '''
+        useful function in order to ask input value and assess that the answer is allowed
+
+        input_string : question
+        valid_options : authorized answers
+        '''
         input_string += "({}) ".format(", ".join(valid_options))
         response = input(input_string)
         while response.lower() not in valid_options:
@@ -109,6 +117,7 @@ class ParseTreeFolder():
         from tkinter import Tk
         from tkinter.filedialog import askopenfilename, askdirectory
 
+        # global class variables
         self.global_score = []
         self.Conductance = False
         self.remove_outlier = False
@@ -119,6 +128,7 @@ class ParseTreeFolder():
         Press Enter to continue ...
         
         ''')
+        # fixed value for self.file_or_folder attribute, to be cleaned in the future
         self.file_or_folder = '1'
         input('')
         # self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
@@ -144,7 +154,8 @@ class ParseTreeFolder():
             ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
 
-
+        # options allowed for the action method
+        # in the future it could be useful to add a combo method that would do '1' & '2' in the same time
         self.choices = {
         "1": self.change_detection,
         "2": self.robust_differential,
@@ -155,12 +166,18 @@ class ParseTreeFolder():
 
 
     def _listdir_fullpath(self, p, s):
+        '''
+        method for creating a list of csv file
+        '''
         import os
         import re
         d=os.path.join(p, s)
         return [os.path.join(d, f) for f in os.listdir(d) if f.endswith('.csv')]
 
     def _detect_cavisoft(self, p, s):
+        '''
+        method for creating a list of conductance files, based on the detection of the string "conductance"
+        '''
         import pandas as pd
         import re
         import os
@@ -184,37 +201,40 @@ class ParseTreeFolder():
             file_root=[]
             self.listOfFiles = []
 
-
+            # method with csv detection
             if self.method_choice == '1':
                 try:
+                    # basedir
                     file_root = [os.path.join(self.path, f) for f in os.listdir(self.path) if f.endswith('.csv')]
                     self.listOfFiles.append(file_root)
-                    print(file_root)
+                    #print(file_root)
                 except:
                     print('no file detected within root directory')
                     pass
 
                 try:
+                    #subfolders
                     for pa, subdirs, files in os.walk(self.path):
                         for s in subdirs:
                             self.listOfFiles.append(self._listdir_fullpath(p=pa, s=s))
                 except:
                     print('no file detected within childs directory')
                     pass
-
+            
+            # method with conductance detection
             if self.method_choice == '2':
                 try:
+                    # base dir
                     file_root = [os.path.join(self.path, f) for f in os.listdir(self.path) if\
                     f.endswith('.csv') and (re.search(r'conductance', pd.read_csv(os.path.join(self.path, f),sep=SEP,nrows=0).columns[0].lower()) )]
                     self.listOfFiles.append(file_root)
-
-
-                    print(file_root)
+                    #print(file_root)
                 except:
                     print('no file detected within root directory')
                     pass
 
                 try:
+                    #subfolders
                     for pa, subdirs, files in os.walk(self.path):
                         for s in subdirs:
                             self.listOfFiles.append(self._detect_cavisoft(p=pa, s=s))
@@ -267,7 +287,7 @@ class ParseTreeFolder():
             self.display_menu()
             choice = input("Enter an option: ")
 
-            
+            # redirection to the self.choices attribute in the __init__
             action = self.choices.get(choice)
 
             if action:
@@ -278,14 +298,25 @@ class ParseTreeFolder():
 
 
     def _min_max(self, X): 
+        '''
+        min max scaler, return array of scaled values comprised between 0 & 1
+        '''
         X_scaled = (X-np.min(X)) / (np.max(X) -  np.min(X))
         return X_scaled
 
     def _RMSE(self, Ypred, Yreal):
+        '''
+        compute the root mean squared error between two arrays of the same length
+        '''
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
         return rmse
 
     def _fit_and_pred(self,X, y, mode, *args):
+        '''
+        fit a linear regression or a exponential regression between 2 arrays X & Y
+        function for the exponential regression should be defined in the self._func() method
+        return the RMSE of the fit
+        '''
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
@@ -301,28 +332,47 @@ class ParseTreeFolder():
         return rmse
     
     def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
+        '''
+        Define a sliding window where the _fit_and_pred() method is applied
+        from start --> end : exp fit
+        from end --> linear fit
+
+
+        '''
+
+        # parameters to avoid exceed data boundaries
         Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-lag-1
+
+        # coordinates of the sliding window
         start = np.arange(window, Xend-window, lag)
 
         if mode == 'linear':
+            # X position of sliding window increment
             mean_start = X[[int(Xend-s) for s in start]]
             score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
                     for s in start]    #[::-1]
         
         if mode == 'exp':
+            # X position of sliding window increment
             mean_start = X[start]
+
+            # if no parameters are provided for constraining the timit of A & B parameters for the exp fitting
             if BOUND == 'NotSet':
                 try:
+                    # find constrained parameters for the exp fitting
                     reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
                     Aa, Bb = reg                     
                     bound = ([Aa-0.015*Aa,Bb/1.05],[Aa+0.015*Aa, Bb*1.05])
                 except:
+                    # if the detection failed, provide wide parameters values
                     bound = ([0,1/1000000],[100, 1/100])
             else:
                 bound=BOUND
             print('bound : ', bound)
             try:
+                # do the exp fit
+                # curve fit from scipy is embedded within _fit_and_pred
                 score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
                         for s in start]
             except:
@@ -333,6 +383,7 @@ class ParseTreeFolder():
                 print('     You should discard values  ')
                 print('+++++++++++++++++++++++++++++++++++\n')
                 time.sleep(1)
+                # if failed, return array of 1
                 score = np.repeat(1, len(start))
         score = self._min_max(score)
         #print('{} score'.format(mode), score)
@@ -340,12 +391,16 @@ class ParseTreeFolder():
 
 
     def _func(self, x, a, b):
+        # equation for the exp fitting
         return a * np.exp(-b * x) 
 
     def _func_lin(self, x, a, b):
         return a * x + b 
     
     def _detect_b(self, X, y, mode):
+        '''
+        function used for detecting boundaries of parameters for the exp fitting
+        '''
         Xarr = np.array(X).reshape(-1)
         yarr = np.array(y).reshape(-1)
         if mode == 'exp':
@@ -353,11 +408,17 @@ class ParseTreeFolder():
         return reg
 
     def _dcross(self, Yl, Ye):
+        '''
+        detect he index where two signals are crossing each others. Based on the detection in a shift in the sign of the difference
+        '''
         idx = np.argwhere(np.diff(np.sign(Yl - Ye))).flatten() 
         return idx
 
-    def _compute_slope(self, Xidx1, interval = False, *args, **kwargs):         
-
+    def _compute_slope(self, Xidx1, interval = False, *args, **kwargs):
+        '''
+        fit a linear regression on a slice of a signal and return slope, intercept, rsqquared and fitted values
+        '''         
+        # this is useful for slicing X value returned by ginput
         if len(Xidx1)>1:
             Xidx1 = Xidx1[0]  
 
@@ -382,7 +443,10 @@ class ParseTreeFolder():
         return slope, intercept, rsquared, fitted_values, X
 
     def _compute_gmin_mean(self, df, slope, t1, t2 = None):
-        
+        '''
+        compute gmin on a slice of a signal
+        use the slope value
+        '''
         if t2 is None:
             df = df[df['delta_time']>= t1].copy()
         if t2 is not None:            
@@ -406,6 +470,10 @@ class ParseTreeFolder():
 
 
     def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe, df):
+        '''
+        detection of the crossing point of the rmse error from the exp & linear fitting
+        yexp & ylin : rmse from the sliding window
+        '''
         gmin_mean=''
         list_of_param=['', '', '', '', '', '']
 
@@ -413,6 +481,7 @@ class ParseTreeFolder():
         Yexp=np.array(Yexp)
         Xl=np.array(Xl)  
         Xe=np.array(Xe) 
+        # detect the index of crossing: needs to reverse the ylin
         idx = self._dcross(Ylin[::-1], Yexp)
         Xidx=Xe[idx]    
 
@@ -420,32 +489,39 @@ class ParseTreeFolder():
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
 
+        
         if len(Xidx)==1:
+            # if only one crossing is detected
             Yidx=self.Ysmooth[self.Xselected == Xidx]
         else:
+            # if more than 1 crossing is detected
             a = []
             [a.append(self.Ysmooth[self.Xselected == i]) for i in Xidx]
             Yidx = a
 
-        
+
+        # plot he figure of the detected crossing sections        
         fig, ax1 = plt.subplots()
         plt.title(self.sample)
 
         color = 'tab:blue'
+        # ax1 : raw signal
         ax1.set_xlabel('time (min)')
         ax1.set_ylabel(self.sample, color=color)
         ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
         ax1.tick_params(axis='y', labelcolor=color)
         color = 'tab:red'
+        # ax1 : smoothed signal
         ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
         
-       
+       # crossing points : printed as red dot
         ax1.plot(Xidx, Yidx, 'ro', markersize=8)
 
         ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
         ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
         ax1.legend(loc='upper right')
 
+        # compute the slope if only 1 crossing point is detected
         if len(Xidx)==1:
             slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
             ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
@@ -453,7 +529,7 @@ class ParseTreeFolder():
         else:
             print('more than 1 crossing point were detected')
 
-
+        # ax2: plot he two RMSE 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
         color = 'tab:green'
         ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
@@ -466,8 +542,7 @@ class ParseTreeFolder():
         ax2.legend(loc='right')
         fig.tight_layout()
 
-        
-
+        # close the graph on a click
         # plt.pause(PAUSE_GRAPH)
         plt.waitforbuttonpress(0)
         # input()
@@ -479,7 +554,8 @@ class ParseTreeFolder():
         for i in np.arange(0,len(idx)):
             print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
         
-
+        # When more than one crossing point are detected
+        # future change the index of the questions
         if len(Xidx)>1:           
             print('''
                     More than 1 crossing point were detected, you have to chose between :
@@ -505,7 +581,8 @@ class ParseTreeFolder():
             self.global_score.append([self.sample, Xidx, slope, rsquared, gmin_mean, list_of_param])
         if what_to_do=='3':
             while True:
-                try:                        
+                try:
+                    # future allow only selection of 1 or 2 points                        
                     _Npoints = int(input('How many points do you want to select ? ') or 1)                
                     break
                 except ValueError:
@@ -513,6 +590,8 @@ class ParseTreeFolder():
 
             First_pass = 0
             while First_pass < 2:
+                # first pass selection of the points
+                # second pass fit the linear regression & compute the slope
                 fig, ax1 = plt.subplots()
                 plt.title(self.sample)
                 color = 'tab:blue'
@@ -574,7 +653,11 @@ class ParseTreeFolder():
         return idx, Xidx, Xidx_int 
     
     def _change_det(self, df, COL_Y='standard'):
-
+        '''
+        detect the crossing point
+        '''
+        
+        # initialization of the sliding window
         if df.shape[0] < 100:
             _wind = int(df.shape[0]/6)
             _lag = 1# int(df.shape[0]/4)
@@ -582,6 +665,8 @@ class ParseTreeFolder():
             _wind = max(int(df.shape[0]/WIND_DIV),int(1))
             _lag = max(int(df.shape[0]/LAG_DIV),int(1))
         _X = df['delta_time'].copy().values
+
+        # eventually col_y could be modified e.g. with argparser (YVAR = 'weight_g' by defeult)
         if COL_Y == 'standard':
             _y = df[YVAR].copy().values
         else:
@@ -590,20 +675,25 @@ class ParseTreeFolder():
         #print(df.head())
         #input()
 
+
+        # create a df_vlaue attritute
         if self.df_value is None:
             self.df_value = pd.DataFrame(columns = df.columns)
         
+        # append to df value
         self.df_value = pd.concat([self.df_value, df], axis = 0, ignore_index = True)
 
-
+        # sliding window & compute rmse for each window
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
 
         # print(score_l, mean_start_l, score_e, mean_start_e )
 
+        # create an empty df for rmse values
         if self.df_rmse is None:
             self.df_rmse = pd.DataFrame(columns = ['Sample', 'RMSE_lin', 'Time_lin', 'RMSE_exp', 'Time_exp'])        
         
+        # concat to rmse df the current file rmse
         df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
         
@@ -627,6 +717,9 @@ class ParseTreeFolder():
         self.remove_outlier=state
 
     def _detect_outlier(self, df, thres):
+        ''' function for dtetecting outlier
+        future to be removed
+        '''
         df_s1 = df.shape[0]
         z = np.abs(stats.zscore(df[YVAR].values))        
         z_idx = np.where(z < thres)
@@ -638,13 +731,24 @@ class ParseTreeFolder():
 
 
 
-    def _parse_samples(self, dffile, FUNC):  
+    def _parse_samples(self, dffile, FUNC): 
+        '''
+        for each file, each unique ID will be analyzed
+        using a FUNC
+        
+        this function will ask if we want to work on raw or smoothed data
+        '''
 
+
+        # activate or inacte remove outlier possibility
+        # future : will be removed, experimental use only
+        # Currently : deactivated
         if self.Conductance:
-            self._turn_on_off_remove_outlier(state=True)
+            self._turn_on_off_remove_outlier(state=False)
         else:
             self._turn_on_off_remove_outlier(state=False)   
 
+        # for each file, slice each unique ID
         for sample in dffile[SAMPLE_ID].unique():
             
             self.sample = sample
@@ -652,8 +756,12 @@ class ParseTreeFolder():
             if self.remove_outlier:
                 df = self._detect_outlier(df=df, thres =THRES)
 
+            # transform time to TRUE date time
             df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
+            # compute time delta between measures
+            # WARNING : the points need to be regurlarly sampled with a constant frequency
             df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+            # convert time to minute
             df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
 
             self.Xselected = df['delta_time'].values
@@ -666,7 +774,9 @@ class ParseTreeFolder():
             df['smooth_data'] = self.Ysmooth.copy()
             df['Work_on_smooth'] = 'No'
 
-            if not self.Conductance:  
+            if not self.Conductance or self.Conductance:  
+                # strange code : but always ask for smoothing
+                # future : can be modified (either always allow smoothing and self.conductance is not useful or smoothinf is forbiden for robust differential)
                 plt.plot(self.Xselected, self.yselected, linestyle='-', marker='.', label = 'raw data')
                 plt.plot(self.Xselected, self.Ysmooth, linestyle='-', marker='.', label = 'smooth')
                 plt.title(self.sample)
@@ -740,6 +850,14 @@ class ParseTreeFolder():
          
 
     def _robust_import(self, elem):
+
+        '''
+        try to open a csv file using several methods
+        should be relatively robust
+        future : robustness could be improved
+
+        use parsefile class
+        '''
         if self.file_or_folder== '1':
             skip=1
         else:
@@ -761,6 +879,9 @@ class ParseTreeFolder():
         
 
     def change_detection(self):
+        '''
+        parse all the files within the folder tree
+        '''
         print('change_detection\n')
         self.Conductance=False
         dimfolder = len(self.listOfFiles)
@@ -786,17 +907,22 @@ class ParseTreeFolder():
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)                    
                     
+                    # future : do i need to use global var as self.globalscore ... ?
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
                     temp_df = pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared', 'Gmin_mean', 'pack'])
                     temp_df2 = pd.DataFrame(temp_df["pack"].to_list(), columns=['K', 'VPD', 'mean_T', 'mean_RH', 'mean_Patm', 'mean_area'])
                     temp_df = temp_df.drop(columns='pack')
                     
+                    # remove the .csv extension from the name
                     temp_folder = os.path.splitext(str(os.path.basename(elem)))[0]
 
                     if not os.path.exists('output_files/' + temp_folder ):
-                        os.makedirs('output_files/' + temp_folder) 
+                        os.makedirs('output_files/' + temp_folder)
+                    # concat df
                     temp_df = pd.concat([temp_df,temp_df2], axis = 1)
                     temp_df['Campaign'] = temp_folder
+
+                    # append df to list
                     list_of_df.append(temp_df)
                     temp_df.to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem))) 
                     #pd.concat([temp_df,temp_df2], axis = 1).to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem)))                 
@@ -807,6 +933,8 @@ class ParseTreeFolder():
                     self.df_value = None
                     self.global_score = []
 
+            # save the appended df in a global file
+            # explode remove the square bracket [] from cells and convert to multiline
             pd.concat(list_of_df).reset_index().explode('Change_points').to_csv('output_files/'+'RMSE_df_complete_full.csv')
             pd.concat(list_of_df).reset_index().explode('Change_points').drop_duplicates(subset=['Campaign','index','Sample_ID','slope']).to_csv('output_files/'+'RMSE_df_complete_full_No_duplicates.csv')
 
@@ -958,7 +1086,7 @@ class ParseTreeFolder():
         _EP2=EP2
 
         print('''
-            Do you want to work on keep this parameters for conductance computation ?
+            Do you want to keep this parameters for conductance computation ?
 
             1: Yes or exit
             2: No, I want to adjust regularization parameters
@@ -968,6 +1096,8 @@ class ParseTreeFolder():
 
         what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
         ########################################################################
+        # keep the firt detected peak to avoid slice issues
+        peaks_0 = peaks
         while True:
             if what_to_do=='1':
                 break
@@ -978,7 +1108,8 @@ class ParseTreeFolder():
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
-                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks, manual_selection=True, Npoints=_Npoints)  
+                
+                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks_0, manual_selection=True, Npoints=_Npoints)  
                 peaks = [str(np.round(i[0],3)) for i in sel_p]
                 #peaks = '['+peaks+']'
 
@@ -1052,6 +1183,7 @@ class ParseTreeFolder():
                                 u0=np.append([0],np.diff(gmin)),
                                 cgtol = 1e-4)
                 ddGmin = dGmin
+                # future : change find peak method that is not super presently                
                 peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
                 peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
                 peaks = np.concatenate((peaks, peaks2), axis=None)
@@ -1083,7 +1215,7 @@ class ParseTreeFolder():
                 df['Peaks'] = ' '.join(map(str,peaks))
         else:
             df['Peaks'] = 'NoPeak'
- 
+        assert self.df_save.columns.size ==  df.columns.size, 'size differs between df_save & df'
         self.df_save.columns = df.columns
         self.df_save = pd.concat([self.df_save, df], axis = 0, ignore_index = True)
 
@@ -1098,7 +1230,8 @@ class ParseTreeFolder():
         self.Conductance = True
         dimfolder = len(self.listOfFiles)
         li_all = []
-        self.df_save = pd.DataFrame(columns = range(0,19))
+        # future add a way to check the length of the columns section
+        self.df_save = pd.DataFrame(columns = range(0,18))
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
