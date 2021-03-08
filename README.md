@@ -123,7 +123,9 @@ The following steps are for the RMSE approach
 #### Step 4
 4. The software proposes to work on raw data or smoothed data. It is often preferable to work on smoothed data.
 <img src="img/2021-03-08_15-43.png" width="75%" height="75%">
-Smoothing parameters can be adjusted. See th lowess method from the statsmodels library. [lowess help](https://www.statsmodels.org/stable/generated/statsmodels.nonparametric.smoothers_lowess.lowess.html)
+Smoothing parameters can be adjusted. See th lowess method from the statsmodels library. 
+
+[Lowess help](https://www.statsmodels.org/stable/generated/statsmodels.nonparametric.smoothers_lowess.lowess.html)
 <img src="img/2021-03-08_15-44.png" width="75%" height="75%">
 
 #### Step 5
