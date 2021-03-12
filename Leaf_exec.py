@@ -11,7 +11,7 @@ if __name__=="__main__":
     # Parser for defining parameters values using the shell
     # default  values can be modified directly HERE in the script or using the shell command line prompt
     parser = argparse.ArgumentParser()
-
+    
     parser.add_argument('-tc','--time_col', default='date_time', 
                         help='which time col', 
                         type = str)
