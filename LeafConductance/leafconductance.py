@@ -27,20 +27,22 @@ print('---------------                                    ---------------------'
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
 
-num_col = ['weight_g','T_C','RH', 'Patm', 'Area_m2']
-group_col=['campaign', 'sample_ID', 'Treatment', 'Operator']
-date=['date_time']
+# num_col = ['weight_g','T_C','RH', 'Patm', 'Area_m2']
+# group_col=['campaign', 'sample_ID', 'Treatment', 'Operator']
+# date=['date_time']
 
 # error_proof
 # GLOBAL VARIABLES
+
 SEP = ','
-TIME_COL = 'date_time'
-SAMPLE_ID = 'sample_ID'
-YVAR = 'weight_g'
-T = 'T_C'
-RH = 'RH'
-PATM = 'Patm'
-AREA = 'Area_m2'
+
+#TIME_COL = 'date_time'
+#SAMPLE_ID = 'sample_ID'
+#YVAR = 'weight_g'
+# T = 'T_C'
+# RH = 'RH'
+# PATM = 'Patm'
+# AREA = 'Area_m2'
 
 WIND_DIV = 8
 LAG_DIV = WIND_DIV * 200
@@ -49,10 +51,10 @@ FRAC_P = 0.1
 PAUSE_GRAPH = 8
 DELTA_MULTI = 0.01
 
-ITERN=10000
-ALPH=1e9#1000
-EP=1e-6
-KERNEL='sq'#'sq'#abs'#'abs'
+# ITERN=10000
+# ALPH=1e9#1000
+# EP=1e-6
+#KERNEL='sq'#'sq'#abs'#'abs'
 THRES = 50 #3
 
 class ParseFile():
@@ -94,7 +96,7 @@ class ParseFile():
 
 
 
-class ParseTreeFolder():
+class ParseTreeFolder(): 
 
 
     def _get_valid_input(self, input_string, valid_options):
@@ -111,11 +113,37 @@ class ParseTreeFolder():
         return response
 
 
-    def __init__(self):
+    def __init__(self,                
+                time_col, 
+                sample_id,
+                yvar,
+                temp,
+                rh,
+                patm,
+                area,
+                iter_n,
+                alpha,
+                epsilon,
+                diff_method):
+
         import time
         # super().__init__()
         from tkinter import Tk
         from tkinter.filedialog import askopenfilename, askdirectory
+
+        
+        self.TIME_COL = time_col
+        self.SAMPLE_ID = sample_id
+        self.YVAR = yvar
+        self.T = temp
+        self.RH = rh
+        self.PATM = patm
+        self.AREA = area
+
+        self.ITERN = iter_n
+        self.ALPH = alpha
+        self.EP = epsilon
+        self.KERNEL = diff_method
 
         # global class variables
         self.global_score = []
@@ -311,82 +339,52 @@ class ParseTreeFolder():
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
         return rmse
 
-    def _fit_and_pred(self,X, y, mode, mode2='raw',phase='lin', *args):
+    def _fit_and_pred(self,X, y, mode, mode2='raw', *args):
         '''
         fit a linear regression or a exponential regression between 2 arrays X & Y
         function for the exponential regression should be defined in the self._func() method
         return the RMSE of the fit
+
+        mode : linear or exp
+        mode2 : raw signal or derivated signal
+
+
         '''
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
             
             # print('log y')
+            print('log y')
             yarr = np.log(yarr)
 
             sample_weight = np.ones(yarr.size) 
-            if mode2 == 'diff':
-                print('mode2 is diff')
-                if yarr.size>10:
-                    nech = 10
-                else:
-                    nech = 5
+            if mode2 == 'raw' or mode2 == 'diff':              
+                reg = LinearRegression().fit(Xarr, yarr, sample_weight)
+                pred = reg.predict(Xarr)
 
-                # penalize the weight of te last
-                # if phase=='exp':
-                #     yarr[int(0.9*yarr.size)::]=np.sqrt(yarr[int(0.9*yarr.size)::])
-                # if phase=='lin':
-                #     # yarr[:np.maximum(int(0.05*yarr.size),5)]=np.square(yarr[:np.maximum(int(0.05*yarr.size),5)])
-                #     yarr[-np.maximum(int(0.05*yarr.size),5):]=np.square(yarr[-np.maximum(int(0.05*yarr.size),5):]+1)
-
-
-                # https://stackoverflow.com/questions/35236836/weighted-linear-regression-with-scikit-learn
-                # Create equal weights and then augment the last 2 ones
-                
-           
-                # if phase=='exp':
-                #     # sample_weight = np.ones(yarr.size) * 20
-                #     # sample_weight[-np.maximum(int(0.05*yarr.size),5):] *= 0.1
-                #     # print('sample weight raw\n', sample_weight)
-                #     # print('phase exp')
-                #     sample_weight = np.arange(1,yarr.size+1) 
-                #     sample_weight = np.square(sample_weight)                   
-                #     sample_weight = sample_weight / sample_weight.max()
-                #     # sample_weight = np.flip(sample_weight)
-                # if phase=='lin':
-                #     # sample_weight = np.ones(yarr.size) * 20
-                #     # sample_weight[:np.maximum(int(0.05*yarr.size),5)] *= 1e5
-                #     # print('sample weight raw\n', sample_weight)
-                #     # print('phase lin')
-                #     sample_weight = np.arange(1,yarr.size+1)  
-                #     sample_weight = np.square(sample_weight)  
-                #     sample_weight = np.flip(sample_weight)             
-                #     sample_weight = sample_weight / sample_weight.max()
-
-                    # sample_weight[int(0.7*yarr.size)::] *= 200
-                    
-                    # input()
-            # print('sample weight\n', sample_weight)
-            reg = LinearRegression().fit(Xarr, yarr, sample_weight)
-            pred = reg.predict(Xarr)
         if mode == 'exp':
-            # Xarr = np.array(X).reshape(-1) # REMOVE THE , -1 WARNING
-            # yarr = np.array(y).reshape(-1)
+            Xarr = np.array(X).reshape(-1) # REMOVE THE , -1 WARNING
+            yarr = np.array(y).reshape(-1)
+
+            # print('sqrt y')
+            # yarr = np.sqrt(yarr)
 
             #--------------------------------------------------------------------
-            Xarr = np.array(X).reshape(-1,1) # 
-            yarr = np.array(y).reshape(-1,1)
-            sample_weight = np.ones(yarr.size)
+            # Xarr = np.array(X).reshape(-1,1) # 
+            # yarr = np.array(y).reshape(-1,1)
+            # sample_weight = np.ones(yarr.size)
             
             # print('exp y')
-            yarr = 1/(np.exp(yarr))
-            reg = LinearRegression().fit(Xarr, yarr, sample_weight)
-            pred = reg.predict(Xarr)
+            # yarr = 1/(np.exp(yarr))
+            # reg = LinearRegression().fit(Xarr, yarr, sample_weight)
+            # pred = reg.predict(Xarr)
             #--------------------------------------------------------------------
-            # if mode2 == 'raw':
-            #     reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
-            #     A, B = reg     
-            #     pred = A * np.exp(-B * Xarr)   
+            if mode2 == 'raw' or mode2 == 'diff':
+                reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
+                A, B = reg     
+                pred = A * np.exp(-B * Xarr)   
+            # it would be eventually possible to define a neww function for the curve fit regression for the exponential part of the derivated signal
             # if mode2 == 'diff':
             #     reg = curve_fit(self._func_d, Xarr, yarr, bounds=args[0])[0]                                       
             #     A, B = reg     
@@ -400,6 +398,9 @@ class ParseTreeFolder():
         Define a sliding window where the _fit_and_pred() method is applied
         from start --> end : exp fit
         from end --> linear fit
+
+        mode : linear or exp
+        mode2 : raw signal or derivated signal
         '''
 
         # parameters to avoid exceed data boundaries
@@ -413,7 +414,7 @@ class ParseTreeFolder():
         if mode2=='diff':
             start = np.arange(window, Xend-window, lag)
         print(mode, mode2)
-        # input()
+        
 
         if mode == 'linear':
             if mode2 == 'raw':
@@ -426,16 +427,14 @@ class ParseTreeFolder():
                 # mean_start = X[[int(Xend-start[i]) for i,_ in enumerate(start) if i < len(start)-1]]
                 mean_start = X[[int(Xend-s) for s in start]]
 
-                print('length of start vector:', len(start))
-                for i, _ in enumerate(start):
-                    if i < len(start)-1:
-                        print('i:', i)
-                        print('lin regression between {}-{}'.format(Xend-start[i+1],Xend-start[i]))
+                # print('length of start vector:', len(start))
+                # for i, _ in enumerate(start):
+                #     if i < len(start)-1:
+                #         print('i:', i)
+                #         print('lin regression between {}-{}'.format(Xend-start[i+1],Xend-start[i]))
                 
                 score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode, mode2) 
-                        for s in start]    #[::-
-                # score = [self._fit_and_pred(X[(Xend-start[i+1]):(Xend-start[i])], y[(Xend-start[i+1]):(Xend-start[i])], mode) 
-                #         for i,_ in enumerate(start) if i < len(start)-1]   
+                        for s in start]    
 
                 print('length of lin score: ', len(score))
                 print('length of lin mean_start: ', len(mean_start))
@@ -486,16 +485,10 @@ class ParseTreeFolder():
                 # do the exp fit
                 # curve fit from scipy is embedded within _fit_and_pred
                 
-                if mode2=='raw':
-                    score = [self._fit_and_pred(X[0:s], y[0:s], mode, mode2,'lin', bound) 
+                # it is the same curve fit method both for diff signal and raw signal
+                if mode2=='raw' or mode2 == 'diff':
+                    score = [self._fit_and_pred(X[0:s], y[0:s], mode, mode2, bound) 
                             for s in start]
-                if mode2 == 'diff':
-                    # score = [self._fit_and_pred(X[start[i]:start[i+1]], y[start[i]:start[i+1]], mode, mode2) #, bound # REMOVED BOUND PARAMETER FOR TESTING
-                    #         for i,_ in enumerate(start) if i < len(start)-1]
-                    # score = [self._fit_and_pred(X[start[i]:start[i+1]], y[start[i]:start[i+1]], 'linear', mode2) #, bound # LINEAR MODE
-                    #         for i,_ in enumerate(start) if i < len(start)-1]
-                    score = [self._fit_and_pred(X[0:s], y[0:s], 'linear',mode2, 'exp',  bound) 
-                            for s in start]  # LINEAR MODE strating from the end
 
                 print('length of exp score: ', len(score))
                 print('length of exp mean_start: ', len(mean_start))
@@ -587,17 +580,17 @@ class ParseTreeFolder():
         k= (slope/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
 
         #Calcul VPD en kpa (Patm = 101.325 kPa)
-        VPD =0.1*((6.13753*np.exp((17.966*np.mean(df[T].values)/(np.mean(df[T].values)+247.15)))) - (np.mean(df[RH].values)/100*(6.13753*np.exp((17.966*np.mean(df[T].values)/(np.mean(df[T].values)+247.15)))))) 
+        VPD =0.1*((6.13753*np.exp((17.966*np.mean(df[self.T].values)/(np.mean(df[self.T].values)+247.15)))) - (np.mean(df[self.RH].values)/100*(6.13753*np.exp((17.966*np.mean(df[self.T].values)/(np.mean(df[self.T].values)+247.15)))))) 
 
         #calcul gmin mmol.s
-        gmin_ = -k * np.mean(df[PATM].values)/VPD
+        gmin_ = -k * np.mean(df[self.PATM].values)/VPD
 
         #calcul gmin en mmol.m-2.s-1
-        gmin = gmin_ / np.mean(df[AREA].values)
+        gmin = gmin_ / np.mean(df[self.AREA].values)
 
         print('gmin_mean: ', gmin)
 
-        return gmin, [k, VPD, np.mean(df[T].values), np.mean(df[RH].values), np.mean(df[PATM].values), np.mean(df[AREA].values)]
+        return gmin, [k, VPD, np.mean(df[self.T].values), np.mean(df[self.RH].values), np.mean(df[self.PATM].values), np.mean(df[self.AREA].values)]
 
 
 
@@ -809,6 +802,8 @@ class ParseTreeFolder():
             else:
                 _wind = max(int(df.shape[0]/WIND_DIV),int(1))
                 _lag = max(int(df.shape[0]/LAG_DIV),int(1))
+
+        # useful for detecting peak within derivated signal
         if mode =='diff':
             if df.shape[0] < 100:
                 _wind = int(df.shape[0]/10)
@@ -820,8 +815,9 @@ class ParseTreeFolder():
         _X = df['delta_time'].copy().values
 
         # eventually col_y could be modified e.g. with argparser (YVAR = 'weight_g' by defeult)
+        # here the tvregdiff return gmin instead of 'standard'
         if COL_Y == 'standard':
-            _y = df[YVAR].copy().values
+            _y = df[self.YVAR].copy().values
         else:
             print("using column: {} as y".format(COL_Y))
             _y = df[COL_Y].copy().values
@@ -831,6 +827,7 @@ class ParseTreeFolder():
 
 
         # create a df_vlaue attritute
+        
         if (self.df_value is None) or (mode == 'diff'):
             self.df_value = pd.DataFrame(columns = df.columns)
         
@@ -876,7 +873,7 @@ class ParseTreeFolder():
         future to be removed
         '''
         df_s1 = df.shape[0]
-        z = np.abs(stats.zscore(df[YVAR].values))        
+        z = np.abs(stats.zscore(df[self.YVAR].values))        
         z_idx = np.where(z < thres)
         #print(np.shape(z_idx))
         #print(z_idx)
@@ -904,15 +901,15 @@ class ParseTreeFolder():
             self._turn_on_off_remove_outlier(state=False)   
 
         # for each file, slice each unique ID
-        for sample in dffile[SAMPLE_ID].unique():
+        for sample in dffile[self.SAMPLE_ID].unique():
             
             self.sample = sample
-            df = dffile.loc[dffile[SAMPLE_ID]==sample,:].copy().reset_index()
+            df = dffile.loc[dffile[self.SAMPLE_ID]==sample,:].copy().reset_index()
             if self.remove_outlier:
                 df = self._detect_outlier(df=df, thres =THRES)
 
             # transform time to TRUE date time
-            df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
+            df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
             # compute time delta between measures
             # WARNING : the points need to be regurlarly sampled with a constant frequency
             df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
@@ -920,12 +917,12 @@ class ParseTreeFolder():
             df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
 
             self.Xselected = df['delta_time'].values
-            self.yselected = df[YVAR].copy().values
+            self.yselected = df[self.YVAR].copy().values
             #print(FRAC_P)
             #print(DELTA_MULTI)
             self.Ysmooth = self._smoother(self.Xselected , self.yselected, fr = FRAC_P, delta_multi = DELTA_MULTI)
 
-            df['raw_data'] = df[YVAR].copy()
+            df['raw_data'] = df[self.YVAR].copy()
             df['smooth_data'] = self.Ysmooth.copy()
             df['Work_on_smooth'] = 'No'
 
@@ -954,7 +951,7 @@ class ParseTreeFolder():
                 what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
                 ########################################################################
                 if what_to_do=='1':
-                    df[YVAR] = self.Ysmooth.copy()
+                    df[self.YVAR] = self.Ysmooth.copy()
                     df['Work_on_smooth'] = 'yes'
                 if what_to_do=='2':
                     while True:          
@@ -997,7 +994,7 @@ class ParseTreeFolder():
                         if what_to_do == '2':
                             pass
                     
-                    df[YVAR] = self.Ysmooth.copy()
+                    df[self.YVAR] = self.Ysmooth.copy()
                     df['Work_on_smooth'] = 'yes'
         
             FUNC(df)
@@ -1153,13 +1150,13 @@ class ParseTreeFolder():
         k= (slope/18.01528)*(1000/60) #ici c'est en minutes (60*60*24)
 
         #Calcul VPD en kpa (Patm = 101.325 kPa)
-        VPD =0.1*((6.13753*np.exp((17.966*(df[T].values)/((df[T].values)+247.15)))) - ((df[RH].values)/100*(6.13753*np.exp((17.966*(df[T].values)/((df[T].values)+247.15)))))) 
+        VPD =0.1*((6.13753*np.exp((17.966*(df[self.T].values)/((df[self.T].values)+247.15)))) - ((df[self.RH].values)/100*(6.13753*np.exp((17.966*(df[self.T].values)/((df[self.T].values)+247.15)))))) 
 
         #calcul gmin mmol.s
-        gmin_ = -k * (df[PATM].values)/VPD
+        gmin_ = -k * (df[self.PATM].values)/VPD
 
         #calcul gmin en mmol.m-2.s-1
-        gmin = gmin_ / (df[AREA].values)
+        gmin = gmin_ / (df[self.AREA].values)
 
         #print('gmin : ', gmin)
         try:
@@ -1175,7 +1172,7 @@ class ParseTreeFolder():
     def _tvregdiff(self,df):
 
         _X = df['delta_time'].copy().values
-        _y = df[YVAR].copy().values
+        _y = df[self.YVAR].copy().values
 
         dX = _X[1] - _X[0]
         if len(_X)<1000:
@@ -1191,55 +1188,37 @@ class ParseTreeFolder():
             DIST = 10
             PROM = 20 #10
             #EP = EP
-            EP2 = EP            
+            EP2 = self.EP            
         else:
             DIV_ALPH = 1 #10
             DIV_ALPH2= 50
             DIST = 50 #200
             PROM = 3#4
             #EP = EP
-            EP2 = EP*1
+            EP2 = self.EP*1
 
-        dYdX = TVRegDiff(data=_y ,itern=ITERN, 
-                        alph=ALPH/DIV_ALPH, dx=dX, 
-                        ep=EP,
+        dYdX = TVRegDiff(data=_y ,itern=self.ITERN, 
+                        alph=self.ALPH/DIV_ALPH, dx=dX, 
+                        ep=self.EP,
                         scale=SCALE ,
                         plotflag=False, 
                         precondflag=PRECOND,
-                        diffkernel=KERNEL,
+                        diffkernel=self.KERNEL,
                         u0=np.append([0],np.diff(_y)),
                         cgtol = 1e-4)   
 
-        gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
-        #df['gmin'] = gmin
-             
-        # dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
-        #                 alph=ALPH/DIV_ALPH2, dx=dX, 
-        #                 ep=EP2,
-        #                 scale=SCALE ,
-        #                 plotflag=False, 
-        #                 precondflag=PRECOND,
-        #                 diffkernel=KERNEL,
-        #                 u0=np.append([0],np.diff(gmin)),
-        #                 cgtol = 1e-4)
-     
-        # ddGmin = dGmin
+        gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)             
+
         
         # _change_det(self, df, COL_Y='standard')
         df['gmin'] = gmin
         peaks, X_peaks, Xpeaks_int = self._change_det(df, COL_Y='gmin', mode = 'diff') # return idx, Xidx, Xidx_int 
-        # peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-        # peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-        # peaks = np.concatenate((peaks, peaks2), axis=None)
-        
-        # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
-        # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = gmin, peaks=peaks) 
         
         #####################################################################################"
         # 
-        _ALPH = ALPH/DIV_ALPH
-        _ALPH2=ALPH/DIV_ALPH2
-        _EP=EP
+        _ALPH = self.ALPH/DIV_ALPH
+        _ALPH2=self.ALPH/DIV_ALPH2
+        _EP=self.EP
         _EP2=EP2
 
         print('''
@@ -1307,51 +1286,19 @@ class ParseTreeFolder():
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
 
-                # old version : not needed anymore as rmse method is applied on differentiated signal
-                # while True:
-                #     try:                    
-                #         _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
-                #         break
-                #     except ValueError:
-                #         print("Oops!  That was no valid number.  Try again...")
-                # while True:
-                #     try:
-                        
-                #         _EP2= float(input('What is the value for epsilon for the derivation? (current value : {}) '.format(_EP2))or _EP2)
-                #         break
-                #     except ValueError:
-                #         print("Oops!  That was no valid number.  Try again...")
-
-                dYdX = TVRegDiff(data=_y ,itern=ITERN, 
+                dYdX = TVRegDiff(data=_y ,itern=self.ITERN, 
                     alph=_ALPH, dx=dX, 
                     ep=_EP,
                     scale=SCALE ,
                     plotflag=False, 
                     precondflag=PRECOND,
-                    diffkernel=KERNEL,
+                    diffkernel=self.KERNEL,
                     u0=np.append([0],np.diff(_y)),
                     cgtol = 1e-4)        
        
                 gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
                 df['gmin'] = gmin
                 peaks, X_peaks, Xpeaks_int = self._change_det(df, COL_Y='gmin', mode = 'diff') # re
-                # dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
-                #                 alph=_ALPH2, dx=dX, 
-                #                 ep=_EP2,
-                #                 scale=SCALE ,
-                #                 plotflag=False, 
-                #                 precondflag=PRECOND,
-                #                 diffkernel=KERNEL,
-                #                 u0=np.append([0],np.diff(gmin)),
-                #                 cgtol = 1e-4)
-                # ddGmin = dGmin
-                # # future : change find peak method that is not super presently                
-                # peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-                # peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-                # peaks = np.concatenate((peaks, peaks2), axis=None)
-
-                # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
-                # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = gmin, peaks=peaks)   
 
                 print('''
                     Do you want to keep this parameters for conductance computation ?
@@ -1419,12 +1366,7 @@ class ParseTreeFolder():
         if not os.path.exists('output_files'):
                 os.makedirs('output_files')
         self.df_save.to_csv('output_files/gmin.csv')
-                    #dfe = 
-                    # df_save.columns = dfe.columns
-                    # df_save = pd.concat([df_save, dfe], axis = 0, ignore_index = True)
-                    # df_save.to_csv('gmin.csv')
 
-  
 
 
             

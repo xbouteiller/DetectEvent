@@ -1,2 +1,2 @@
 ,Sample_ID,Change_points,slope,Rsquared,Gmin_mean,K,VPD,mean_T,mean_RH,mean_Patm,mean_area,Campaign
-0,B22_LITU_BL_09,[1180.],-0.0001432090050459112,0.8162205109832201,0.1772882149912808,-0.0001324884626142467,1.3251367280420017,26.362085084033613,61.785294117647055,101.32500000000005,0.057141825999999986,auto_gmin_testdataset (another copy)
+0,B22_LITU_BL_09,Failed,Failed,Failed,Failed,,,,,,,auto_gmin_testdataset (another copy)
