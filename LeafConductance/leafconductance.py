@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V0.5              ---------------------')
+print('---------------                  V0.6              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -320,6 +320,9 @@ class ParseTreeFolder():
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
+
+            #yarr = 1/np.log(yarr)
+
             reg = LinearRegression().fit(Xarr, yarr)
             pred = reg.predict(Xarr)
         if mode == 'exp':
@@ -328,6 +331,7 @@ class ParseTreeFolder():
             reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
             A, B = reg     
             pred = A * np.exp(-B * Xarr)
+            #pred = (-1/(A * np.exp(-B * Xarr))) +1
         rmse = self._RMSE(pred, yarr)
         return rmse
     
@@ -393,6 +397,7 @@ class ParseTreeFolder():
     def _func(self, x, a, b):
         # equation for the exp fitting
         return a * np.exp(-b * x) 
+        #return (-1/(a * np.exp(-b * x))) + 1
 
     def _func_lin(self, x, a, b):
         return a * x + b 
@@ -757,7 +762,22 @@ class ParseTreeFolder():
                 df = self._detect_outlier(df=df, thres =THRES)
 
             # transform time to TRUE date time
-            df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)  
+            print("\nTrying to detect date format with the international convention YYYY/MM/DD HH:MM")
+            try:               
+                df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , format= "%Y/%M/%d %H:%M")  
+                print('International date format was recognized')             
+            except:
+                print("\nDate Format is not set with the international standard format : YYYY/MM/DD HH:MM")               
+
+                try:
+                    print("")
+                    print("Trying to infer date format ...")
+                    print("This can lead to error when parsing date format")
+                    time.sleep(0.5)
+                    df['TIME_COL2'] = pd.to_datetime(df[TIME_COL] , infer_datetime_format=True)
+                except:
+                    raise Exception("Date format can't be inferred") 
+
             # compute time delta between measures
             # WARNING : the points need to be regurlarly sampled with a constant frequency
             df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
