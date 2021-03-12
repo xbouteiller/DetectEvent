@@ -754,6 +754,7 @@ class ParseTreeFolder():
             self._turn_on_off_remove_outlier(state=False)   
 
         # for each file, slice each unique ID
+        print(dffile.head)
         for sample in dffile[SAMPLE_ID].unique():
             
             self.sample = sample
@@ -878,7 +879,7 @@ class ParseTreeFolder():
 
         use parsefile class
         '''
-        if self.file_or_folder== '1':
+        if self.method_choice== '2':
             skip=1
         else:
             skip=0
