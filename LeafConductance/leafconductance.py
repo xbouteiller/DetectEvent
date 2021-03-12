@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V0.5              ---------------------')
+print('---------------                  V1.0              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -46,13 +46,13 @@ WIND_DIV = 8
 LAG_DIV = WIND_DIV * 200
 BOUND = 'NotSet'
 FRAC_P = 0.1
-DELTA_MULTI = 0.01
 PAUSE_GRAPH = 8
+DELTA_MULTI = 0.01
 
 ITERN=10000
-ALPH=1000
+ALPH=1e9#1000
 EP=1e-6
-KERNEL='abs'#'sq'#abs'#'abs'
+KERNEL='sq'#'sq'#abs'#'abs'
 THRES = 50 #3
 
 class ParseFile():
@@ -311,7 +311,7 @@ class ParseTreeFolder():
         rmse = np.sqrt(np.sum(np.square(Ypred-Yreal))/np.shape(Ypred)[0])
         return rmse
 
-    def _fit_and_pred(self,X, y, mode, *args):
+    def _fit_and_pred(self,X, y, mode, mode2='raw',phase='lin', *args):
         '''
         fit a linear regression or a exponential regression between 2 arrays X & Y
         function for the exponential regression should be defined in the self._func() method
@@ -320,24 +320,86 @@ class ParseTreeFolder():
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
-            reg = LinearRegression().fit(Xarr, yarr)
+            
+            # print('log y')
+            yarr = np.log(yarr)
+
+            sample_weight = np.ones(yarr.size) 
+            if mode2 == 'diff':
+                print('mode2 is diff')
+                if yarr.size>10:
+                    nech = 10
+                else:
+                    nech = 5
+
+                # penalize the weight of te last
+                # if phase=='exp':
+                #     yarr[int(0.9*yarr.size)::]=np.sqrt(yarr[int(0.9*yarr.size)::])
+                # if phase=='lin':
+                #     # yarr[:np.maximum(int(0.05*yarr.size),5)]=np.square(yarr[:np.maximum(int(0.05*yarr.size),5)])
+                #     yarr[-np.maximum(int(0.05*yarr.size),5):]=np.square(yarr[-np.maximum(int(0.05*yarr.size),5):]+1)
+
+
+                # https://stackoverflow.com/questions/35236836/weighted-linear-regression-with-scikit-learn
+                # Create equal weights and then augment the last 2 ones
+                
+           
+                # if phase=='exp':
+                #     # sample_weight = np.ones(yarr.size) * 20
+                #     # sample_weight[-np.maximum(int(0.05*yarr.size),5):] *= 0.1
+                #     # print('sample weight raw\n', sample_weight)
+                #     # print('phase exp')
+                #     sample_weight = np.arange(1,yarr.size+1) 
+                #     sample_weight = np.square(sample_weight)                   
+                #     sample_weight = sample_weight / sample_weight.max()
+                #     # sample_weight = np.flip(sample_weight)
+                # if phase=='lin':
+                #     # sample_weight = np.ones(yarr.size) * 20
+                #     # sample_weight[:np.maximum(int(0.05*yarr.size),5)] *= 1e5
+                #     # print('sample weight raw\n', sample_weight)
+                #     # print('phase lin')
+                #     sample_weight = np.arange(1,yarr.size+1)  
+                #     sample_weight = np.square(sample_weight)  
+                #     sample_weight = np.flip(sample_weight)             
+                #     sample_weight = sample_weight / sample_weight.max()
+
+                    # sample_weight[int(0.7*yarr.size)::] *= 200
+                    
+                    # input()
+            # print('sample weight\n', sample_weight)
+            reg = LinearRegression().fit(Xarr, yarr, sample_weight)
             pred = reg.predict(Xarr)
         if mode == 'exp':
-            Xarr = np.array(X).reshape(-1)
-            yarr = np.array(y).reshape(-1)
-            reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]                                         
-            A, B = reg     
-            pred = A * np.exp(-B * Xarr)
+            # Xarr = np.array(X).reshape(-1) # REMOVE THE , -1 WARNING
+            # yarr = np.array(y).reshape(-1)
+
+            #--------------------------------------------------------------------
+            Xarr = np.array(X).reshape(-1,1) # 
+            yarr = np.array(y).reshape(-1,1)
+            sample_weight = np.ones(yarr.size)
+            
+            # print('exp y')
+            yarr = 1/(np.exp(yarr))
+            reg = LinearRegression().fit(Xarr, yarr, sample_weight)
+            pred = reg.predict(Xarr)
+            #--------------------------------------------------------------------
+            # if mode2 == 'raw':
+            #     reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
+            #     A, B = reg     
+            #     pred = A * np.exp(-B * Xarr)   
+            # if mode2 == 'diff':
+            #     reg = curve_fit(self._func_d, Xarr, yarr, bounds=args[0])[0]                                       
+            #     A, B = reg     
+            #     pred = A* np.exp(-B * Xarr)
+
         rmse = self._RMSE(pred, yarr)
         return rmse
     
-    def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND):
+    def _sliding_window_pred(self, X, y, window, lag, mode, b=BOUND, mode2='raw'):
         '''
         Define a sliding window where the _fit_and_pred() method is applied
         from start --> end : exp fit
         from end --> linear fit
-
-
         '''
 
         # parameters to avoid exceed data boundaries
@@ -345,36 +407,98 @@ class ParseTreeFolder():
         Xmax = np.shape(X)[0]-lag-1
 
         # coordinates of the sliding window
-        start = np.arange(window, Xend-window, lag)
+
+        if mode2=='raw':
+            start = np.arange(window, Xend-window, lag)
+        if mode2=='diff':
+            start = np.arange(window, Xend-window, lag)
+        print(mode, mode2)
+        # input()
 
         if mode == 'linear':
+            if mode2 == 'raw':
             # X position of sliding window increment
-            mean_start = X[[int(Xend-s) for s in start]]
-            score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
-                    for s in start]    #[::-1]
-        
+                mean_start = X[[int(Xend-s) for s in start]]
+                score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode) 
+                        for s in start]    #[::-1]
+
+            if mode2 == 'diff':
+                # mean_start = X[[int(Xend-start[i]) for i,_ in enumerate(start) if i < len(start)-1]]
+                mean_start = X[[int(Xend-s) for s in start]]
+
+                print('length of start vector:', len(start))
+                for i, _ in enumerate(start):
+                    if i < len(start)-1:
+                        print('i:', i)
+                        print('lin regression between {}-{}'.format(Xend-start[i+1],Xend-start[i]))
+                
+                score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode, mode2) 
+                        for s in start]    #[::-
+                # score = [self._fit_and_pred(X[(Xend-start[i+1]):(Xend-start[i])], y[(Xend-start[i+1]):(Xend-start[i])], mode) 
+                #         for i,_ in enumerate(start) if i < len(start)-1]   
+
+                print('length of lin score: ', len(score))
+                print('length of lin mean_start: ', len(mean_start))
         if mode == 'exp':
             # X position of sliding window increment
-            mean_start = X[start]
-
+            if mode2=='raw':
+                mean_start = X[start]
+            if mode2=='diff':
+                # mean_start = X[[start[i] for i,_ in enumerate(start) if i < len(start)-1]]
+                mean_start = X[start]
             # if no parameters are provided for constraining the timit of A & B parameters for the exp fitting
             if BOUND == 'NotSet':
                 try:
                     # find constrained parameters for the exp fitting
-                    reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
-                    Aa, Bb = reg                     
-                    bound = ([Aa-0.015*Aa,Bb/1.05],[Aa+0.015*Aa, Bb*1.05])
+                    if mode2 == 'raw':
+                        reg = self._detect_b( X[lag:lag+(window*2)], y[lag:lag+(window*2)], mode)
+                    if mode2 == 'diff':
+                        print('size of y ',y.size)
+                        tinf = lag/y.size#1/771
+                        tsup = lag+(window*2)/y.size #0.3#(1/771)*193
+                        print('default window value {}-{}'.format(lag, lag+(window*2)))
+                        print('window for estimating bound {}-{}\n'.format(int(y.size * tinf),int(y.size * tsup)))
+                        reg = self._detect_b( X[int(y.size * tinf): int(y.size * tsup)], y[int(y.size * tinf): int(y.size * tsup)], mode, mode2=mode2)
+                   
+                    Aa, Bb = reg
+                    print('Estimated bound # are : {}-{}'.format(Aa,Bb))
+
+                    if mode2 == 'raw':                      
+                        bound = ([Aa-0.015*Aa,Bb/1.05],[Aa+0.015*Aa, Bb*1.05])
+                    if mode2 == 'diff':
+                        ssub = 0.4
+                        sdiv = 1.4                       
+                        print('mode is {}\nrestricted bound values'.format(mode2))
+                        bound =  ([0,1/1000000],[100, 1/100])#([Aa-ssub*Aa,Bb/sdiv],[Aa+ssub*Aa, Bb*sdiv])
                 except:
                     # if the detection failed, provide wide parameters values
                     bound = ([0,1/1000000],[100, 1/100])
             else:
                 bound=BOUND
             print('bound : ', bound)
+
+            # score = [self._fit_and_pred(X[0:s], y[0:s], mode, mode2, 'lin', bound) 
+            #                 for s in start]
+            # print('score', score)
+            # input()
+
             try:
                 # do the exp fit
                 # curve fit from scipy is embedded within _fit_and_pred
-                score = [self._fit_and_pred(X[0:s], y[0:s], mode, bound) 
-                        for s in start]
+                
+                if mode2=='raw':
+                    score = [self._fit_and_pred(X[0:s], y[0:s], mode, mode2,'lin', bound) 
+                            for s in start]
+                if mode2 == 'diff':
+                    # score = [self._fit_and_pred(X[start[i]:start[i+1]], y[start[i]:start[i+1]], mode, mode2) #, bound # REMOVED BOUND PARAMETER FOR TESTING
+                    #         for i,_ in enumerate(start) if i < len(start)-1]
+                    # score = [self._fit_and_pred(X[start[i]:start[i+1]], y[start[i]:start[i+1]], 'linear', mode2) #, bound # LINEAR MODE
+                    #         for i,_ in enumerate(start) if i < len(start)-1]
+                    score = [self._fit_and_pred(X[0:s], y[0:s], 'linear',mode2, 'exp',  bound) 
+                            for s in start]  # LINEAR MODE strating from the end
+
+                print('length of exp score: ', len(score))
+                print('length of exp mean_start: ', len(mean_start))
             except:
                 #raise Exception('Failed to fit Exponential curve')
 
@@ -394,17 +518,25 @@ class ParseTreeFolder():
         # equation for the exp fitting
         return a * np.exp(-b * x) 
 
+    def _func_d(self, x, a, b):
+        # equation for the exp fitting
+        return a*np.exp(-b * x) 
+
+
     def _func_lin(self, x, a, b):
         return a * x + b 
     
-    def _detect_b(self, X, y, mode):
+    def _detect_b(self, X, y, mode, mode2='raw'):
         '''
         function used for detecting boundaries of parameters for the exp fitting
         '''
         Xarr = np.array(X).reshape(-1)
         yarr = np.array(y).reshape(-1)
         if mode == 'exp':
-            reg = curve_fit(self._func, Xarr, yarr)[0]
+            if mode2 == 'raw':
+                reg = curve_fit(self._func, Xarr, yarr)[0]
+            if mode2 == 'diff':
+                reg = curve_fit(self._func_d, Xarr, yarr)[0]
         return reg
 
     def _dcross(self, Yl, Ye):
@@ -469,7 +601,7 @@ class ParseTreeFolder():
 
 
 
-    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe, df):
+    def _detect_crossing_int(self, Yexp, Ylin, Xl, Xe, df, mode = 'raw'):
         '''
         detection of the crossing point of the rmse error from the exp & linear fitting
         yexp & ylin : rmse from the sliding window
@@ -489,205 +621,227 @@ class ParseTreeFolder():
         idx_int = [[i, i+1] for i in idx]
         Xidx_int = [[Xe[i], Xe[i+1] ]for i in idx]
 
+        if mode == 'diff':
+            self.yselected = df['gmin']
         
         if len(Xidx)==1:
             # if only one crossing is detected
-            Yidx=self.Ysmooth[self.Xselected == Xidx]
+            if mode == 'raw':
+                Yidx=self.Ysmooth[self.Xselected == Xidx]
+            if mode == 'diff':
+                Yidx=self.yselected[self.Xselected == Xidx]
         else:
             # if more than 1 crossing is detected
             a = []
-            [a.append(self.Ysmooth[self.Xselected == i]) for i in Xidx]
-            Yidx = a
+            if mode == 'raw':
+                [a.append(self.Ysmooth[self.Xselected == i]) for i in Xidx]
+                Yidx = a
+            if mode == 'diff':
+                [a.append(self.yselected[self.Xselected == i]) for i in Xidx]
+                Yidx = a
 
+        if mode == 'raw' or mode != 'raw':
+            # plot the figure of the detected crossing sections        
+            fig, ax1 = plt.subplots()
+            plt.title(self.sample)
 
-        # plot he figure of the detected crossing sections        
-        fig, ax1 = plt.subplots()
-        plt.title(self.sample)
-
-        color = 'tab:blue'
-        # ax1 : raw signal
-        ax1.set_xlabel('time (min)')
-        ax1.set_ylabel(self.sample, color=color)
-        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
-        ax1.tick_params(axis='y', labelcolor=color)
-        color = 'tab:red'
-        # ax1 : smoothed signal
-        ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
-        
-       # crossing points : printed as red dot
-        ax1.plot(Xidx, Yidx, 'ro', markersize=8)
-
-        ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
-        ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
-        ax1.legend(loc='upper right')
-
-        # compute the slope if only 1 crossing point is detected
-        if len(Xidx)==1:
-            slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
-            ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
-            gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=Xidx[0], t2 = None)
-        else:
-            print('more than 1 crossing point were detected')
-
-        # ax2: plot he two RMSE 
-        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-        color = 'tab:green'
-        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
-        ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
-        #ax2.tick_params(axis='y', labelcolor=color)
-        color = 'tab:orange'
-        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-        ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
-        ax2.tick_params(axis='y', labelcolor=color)
-        ax2.legend(loc='right')
-        fig.tight_layout()
-
-        # close the graph on a click
-        # plt.pause(PAUSE_GRAPH)
-        plt.waitforbuttonpress(0)
-        # input()
-        plt.close()   
-
-       
-
-        print('\nInterval method')
-        for i in np.arange(0,len(idx)):
-            print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
-        
-        # When more than one crossing point are detected
-        # future change the index of the questions
-        if len(Xidx)>1:           
-            print('''
-                    More than 1 crossing point were detected, you have to chose between :
-                    
-                    2: No, discard
-                    3. Select values manually on graph
-                    ''')                
-            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('2','3'))
-                
-        else :
-            print('''
-                Do you want to keep the crossing value ?
-
-                1: Yes, save
-                2: No, discard
-                3. Select values manually on graph
-                ''')
-            what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
-
-        if what_to_do=='2':
-            self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded', ['', '', '', '', '', '']])
-        if what_to_do=='1':
-            self.global_score.append([self.sample, Xidx, slope, rsquared, gmin_mean, list_of_param])
-        if what_to_do=='3':
-            while True:
-                try:
-                    # future allow only selection of 1 or 2 points                        
-                    _Npoints = int(self._get_valid_input('How many points do you want to select ? ',('1', '2')) or 1)              
-                    break
-                except ValueError:
-                    print("Oops!  That was no valid number.  Try again...")
-
-            First_pass = 0
-            while First_pass < 2:
-                # first pass selection of the points
-                # second pass fit the linear regression & compute the slope
-                fig, ax1 = plt.subplots()
-                plt.title(self.sample)
-                color = 'tab:blue'
-                ax1.set_xlabel('time (min)')
-                ax1.set_ylabel(self.sample, color=color)
-                ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
-                ax1.tick_params(axis='y', labelcolor=color)
-                color = 'tab:red'
+            color = 'tab:blue'
+            # ax1 : raw signal
+            ax1.set_xlabel('time (min)')
+            ax1.set_ylabel(self.sample, color=color)
+            ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+            ax1.tick_params(axis='y', labelcolor=color)
+            color = 'tab:red'
+            # ax1 : smoothed signal
+            if mode != 'diff':
                 ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
-                ax1.plot(Xidx, Yidx, 'ro', markersize=8)
-                ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
-                ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
-                ax1.legend(loc='upper right')
+            
+            # crossing points : printed as red dot
+            ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+
+            ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+            ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+            ax1.legend(loc='upper right')
+
+            # compute the slope if only 1 crossing point is detected
+            if len(Xidx)==1:
+                slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=Xidx)
+                ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
+                gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=Xidx[0], t2 = None)
+            else:
+                print('more than 1 crossing point were detected')
+
+            # ax2: plot he two RMSE 
+            ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+            color = 'tab:green'
+            ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+            ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
+            #ax2.tick_params(axis='y', labelcolor=color)
+            color = 'tab:orange'
+            ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+            ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
+            ax2.tick_params(axis='y', labelcolor=color)
+            ax2.legend(loc='right')
+            fig.tight_layout()
+
+            # close the graph on a click
+            # plt.pause(PAUSE_GRAPH)
+            plt.waitforbuttonpress(0)
+            # input()
+            plt.close()   
+
+        
+
+            print('\nInterval method')
+            for i in np.arange(0,len(idx)):
+                print('detected changes between times : {} - {}'.format(Xidx_int[i][0], Xidx_int[i][1]))
+            
+            if mode == 'raw':
+                # When more than one crossing point are detected
+                # future change the index of the questions
+                if len(Xidx)>1:           
+                    print('''
+                            More than 1 crossing point were detected, you have to chose between :
+                            
+                            2: No, discard
+                            3. Select values manually on graph
+                            ''')                
+                    what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('2','3'))
                         
+                else :
+                    print('''
+                        Do you want to keep the crossing value ?
 
-                ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-                color = 'tab:green'
-                ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
-                ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
-                #ax2.tick_params(axis='y', labelcolor=color)
-                color = 'tab:orange'
-                ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
-                ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
-                ax2.tick_params(axis='y', labelcolor=color)
-                ax2.legend(loc='right')
-                fig.tight_layout()
+                        1: Yes, save
+                        2: No, discard
+                        3. Select values manually on graph
+                        ''')
+                    what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2','3'))
 
-                if First_pass == 0:
-                    selected_points = fig.ginput(_Npoints)
-                    if _Npoints==1:
-                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=selected_points[0])
-                        gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = None)                       
-                    elif _Npoints==2:
-                        slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(selected_points[0], True, selected_points[1]) 
-                        gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = selected_points[1][0])                         
-                    else:
-                        print('unable to fit regression')
+                if what_to_do=='2':
+                    self.global_score.append([self.sample,'Discarded','Discarded','Discarded','Discarded', ['', '', '', '', '', '']])
+                if what_to_do=='1':
+                    self.global_score.append([self.sample, Xidx, slope, rsquared, gmin_mean, list_of_param])
+                if what_to_do=='3':
+                    while True:
+                        try:
+                            # future allow only selection of 1 or 2 points                        
+                            _Npoints = int(self._get_valid_input('How many points do you want to select ? ',('1', '2')) or 1)              
+                            break
+                        except ValueError:
+                            print("Oops!  That was no valid number.  Try again...")
 
-                else:                    
-                    if _Npoints==1:                       
-                        ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
-                    elif _Npoints==2:                        
-                        ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
-                    else:
-                        print('unable to fit regression')
+                    First_pass = 0
+                    while First_pass < 2:
+                        # first pass selection of the points
+                        # second pass fit the linear regression & compute the slope
+                        fig, ax1 = plt.subplots()
+                        plt.title(self.sample)
+                        color = 'tab:blue'
+                        ax1.set_xlabel('time (min)')
+                        ax1.set_ylabel(self.sample, color=color)
+                        ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+                        ax1.tick_params(axis='y', labelcolor=color)
+                        color = 'tab:red'
+                        if mode != 'diff':
+                            ax1.plot(self.Xselected, self.Ysmooth, color=color, lw=2, linestyle='-', label = 'smooth')        
+                        ax1.plot(Xidx, Yidx, 'ro', markersize=8)
+                        ax1.hlines(xmin=0,xmax=self.Xselected[-1],y=Yidx, color='red', lw=0.8, linestyle='--')
+                        ax1.vlines(ymin=np.min(self.yselected),ymax = np.max(self.yselected),x=Xidx, color='red', lw=0.8, linestyle='--')
+                        ax1.legend(loc='upper right')
+                                
+
+                        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+                        color = 'tab:green'
+                        ax2.set_ylabel('RMSE')  # we already handled the x-label with ax1
+                        ax2.plot(Xl, Ylin, color=color,  marker='.', label = 'RMSE lin')
+                        #ax2.tick_params(axis='y', labelcolor=color)
+                        color = 'tab:orange'
+                        ax2.set_ylabel('RMSE', color=color)  # we already handled the x-label with ax1
+                        ax2.plot(Xe, Yexp, color=color, marker='.', label = 'RMSE exp')
+                        ax2.tick_params(axis='y', labelcolor=color)
+                        ax2.legend(loc='right')
+                        fig.tight_layout()
+
+                        if First_pass == 0:
+                            selected_points = fig.ginput(_Npoints)
+                            if _Npoints==1:
+                                slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(Xidx1=selected_points[0])
+                                gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = None)                       
+                            elif _Npoints==2:
+                                slope, intercept, rsquared, fitted_values, Xreg = self._compute_slope(selected_points[0], True, selected_points[1]) 
+                                gmin_mean, list_of_param = self._compute_gmin_mean(df=df, slope=slope, t1=selected_points[0][0], t2 = selected_points[1][0])                         
+                            else:
+                                print('unable to fit regression')
+
+                        else:                    
+                            if _Npoints==1:                       
+                                ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
+                            elif _Npoints==2:                        
+                                ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
+                            else:
+                                print('unable to fit regression')
+                        
+                        plt.waitforbuttonpress(0)      
+                        plt.close()
+                        First_pass+=1
+
                 
-                plt.waitforbuttonpress(0)      
-                plt.close()
-                First_pass+=1
-
-           
-            print('\nSelected points at time : ', ' '.join([str(i[0]) for i in selected_points ]))
-            print('\n')
-            self.global_score.append([self.sample, [i[0] for i in selected_points ], slope, rsquared, gmin_mean, list_of_param])  
+                    print('\nSelected points at time : ', ' '.join([str(i[0]) for i in selected_points ]))
+                    print('\n')
+                    self.global_score.append([self.sample, [i[0] for i in selected_points ], slope, rsquared, gmin_mean, list_of_param])  
 
 
         print('gs',self.global_score)
 
         return idx, Xidx, Xidx_int 
     
-    def _change_det(self, df, COL_Y='standard'):
+    def _change_det(self, df, COL_Y='standard', mode = 'raw'):
         '''
         detect the crossing point
         '''
         
         # initialization of the sliding window
-        if df.shape[0] < 100:
-            _wind = int(df.shape[0]/6)
-            _lag = 1# int(df.shape[0]/4)
-        else:
-            _wind = max(int(df.shape[0]/WIND_DIV),int(1))
-            _lag = max(int(df.shape[0]/LAG_DIV),int(1))
+        if mode == 'raw':
+            if df.shape[0] < 100:
+                _wind = int(df.shape[0]/6)
+                _lag = 1# int(df.shape[0]/4)
+            else:
+                _wind = max(int(df.shape[0]/WIND_DIV),int(1))
+                _lag = max(int(df.shape[0]/LAG_DIV),int(1))
+        if mode =='diff':
+            if df.shape[0] < 100:
+                _wind = int(df.shape[0]/10)
+                _lag = 1# int(df.shape[0]/4)
+            else:
+                _wind = max(int(df.shape[0]/100),int(1))
+                _lag = max(int(df.shape[0]/50),int(1))
+
         _X = df['delta_time'].copy().values
 
         # eventually col_y could be modified e.g. with argparser (YVAR = 'weight_g' by defeult)
         if COL_Y == 'standard':
             _y = df[YVAR].copy().values
         else:
-             _y = df[COL_Y].copy().values
+            print("using column: {} as y".format(COL_Y))
+            _y = df[COL_Y].copy().values
 
         #print(df.head())
         #input()
 
 
         # create a df_vlaue attritute
-        if self.df_value is None:
+        if (self.df_value is None) or (mode == 'diff'):
             self.df_value = pd.DataFrame(columns = df.columns)
         
         # append to df value
         self.df_value = pd.concat([self.df_value, df], axis = 0, ignore_index = True)
 
         # sliding window & compute rmse for each window
-        score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear')
-        score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp')
+        score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear', mode2 = mode)
+        score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp', mode2 = mode)
 
-        # print(score_l, mean_start_l, score_e, mean_start_e )
+        print("Before exception ", score_l, mean_start_l, score_e, mean_start_e )
 
         # create an empty df for rmse values
         if self.df_rmse is None:
@@ -698,7 +852,8 @@ class ParseTreeFolder():
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
         
         try:
-            idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df) #Yexp, Ylin, Xl, Xe
+            idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df, mode = mode) #Yexp, Ylin, Xl, Xe
+            return idx, Xidx, Xidx_int 
         except:
             print('detect crossing failed, probable cause is that more than 1 crossing were detected')
             try:
@@ -881,8 +1036,13 @@ class ParseTreeFolder():
     def change_detection(self):
         '''
         parse all the files within the folder tree
+
+       
         '''
+
         print('change_detection\n')
+
+    
         self.Conductance=False
         dimfolder = len(self.listOfFiles)
         li_all = []
@@ -937,13 +1097,7 @@ class ParseTreeFolder():
             # explode remove the square bracket [] from cells and convert to multiline
             pd.concat(list_of_df).reset_index().explode('Change_points').to_csv('output_files/'+'RMSE_df_complete_full.csv')
             pd.concat(list_of_df).reset_index().explode('Change_points').drop_duplicates(subset=['Campaign','index','Sample_ID','slope']).to_csv('output_files/'+'RMSE_df_complete_full_No_duplicates.csv')
-
-            # pd.DataFrame(self.global_score, columns = ['Sample_ID', 'Change_points','slope', 'Rsquared']).to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
-            # self.df_rmse.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
-            # self.df_value.to_csv('RMSE_detection_'+str(os.path.basename(elem))+'.csv')
-            # self.df_rmse = None
-            # self.df_value = None
-        
+                
         
     def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' , manual_selection=False, Npoints=1):
         
@@ -1059,24 +1213,27 @@ class ParseTreeFolder():
         gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
         #df['gmin'] = gmin
              
-        dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
-                        alph=ALPH/DIV_ALPH2, dx=dX, 
-                        ep=EP2,
-                        scale=SCALE ,
-                        plotflag=False, 
-                        precondflag=PRECOND,
-                        diffkernel=KERNEL,
-                        u0=np.append([0],np.diff(gmin)),
-                        cgtol = 1e-4)
+        # dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+        #                 alph=ALPH/DIV_ALPH2, dx=dX, 
+        #                 ep=EP2,
+        #                 scale=SCALE ,
+        #                 plotflag=False, 
+        #                 precondflag=PRECOND,
+        #                 diffkernel=KERNEL,
+        #                 u0=np.append([0],np.diff(gmin)),
+        #                 cgtol = 1e-4)
      
-        ddGmin = dGmin
+        # ddGmin = dGmin
         
-        peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-        peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-        peaks = np.concatenate((peaks, peaks2), axis=None)
+        # _change_det(self, df, COL_Y='standard')
+        df['gmin'] = gmin
+        peaks, X_peaks, Xpeaks_int = self._change_det(df, COL_Y='gmin', mode = 'diff') # return idx, Xidx, Xidx_int 
+        # peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        # peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+        # peaks = np.concatenate((peaks, peaks2), axis=None)
         
-        self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
-
+        # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+        # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = gmin, peaks=peaks) 
         
         #####################################################################################"
         # 
@@ -1109,7 +1266,9 @@ class ParseTreeFolder():
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
                 
-                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks_0, manual_selection=True, Npoints=_Npoints)  
+                # sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks_0, manual_selection=True, Npoints=_Npoints)  
+                sel_p = self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = gmin, peaks=peaks_0, manual_selection=True, Npoints=_Npoints)  
+
                 peaks = [str(np.round(i[0],3)) for i in sel_p]
                 #peaks = '['+peaks+']'
 
@@ -1147,19 +1306,21 @@ class ParseTreeFolder():
                         break
                     except ValueError:
                         print("Oops!  That was no valid number.  Try again...")
-                while True:
-                    try:                    
-                        _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
-                        break
-                    except ValueError:
-                        print("Oops!  That was no valid number.  Try again...")
-                while True:
-                    try:
+
+                # old version : not needed anymore as rmse method is applied on differentiated signal
+                # while True:
+                #     try:                    
+                #         _ALPH2= float(input('What is the value for alpha for the derivation ? (current value : {}) '.format(_ALPH2)) or _ALPH2)
+                #         break
+                #     except ValueError:
+                #         print("Oops!  That was no valid number.  Try again...")
+                # while True:
+                #     try:
                         
-                        _EP2= float(input('What is the value for epsilon for the derivation? (current value : {}) '.format(_EP2))or _EP2)
-                        break
-                    except ValueError:
-                        print("Oops!  That was no valid number.  Try again...")
+                #         _EP2= float(input('What is the value for epsilon for the derivation? (current value : {}) '.format(_EP2))or _EP2)
+                #         break
+                #     except ValueError:
+                #         print("Oops!  That was no valid number.  Try again...")
 
                 dYdX = TVRegDiff(data=_y ,itern=ITERN, 
                     alph=_ALPH, dx=dX, 
@@ -1172,23 +1333,26 @@ class ParseTreeFolder():
                     cgtol = 1e-4)        
        
                 gmin, k, VPD = self._compute_gmin(slope = dYdX, df = df)
-         
-                dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
-                                alph=_ALPH2, dx=dX, 
-                                ep=_EP2,
-                                scale=SCALE ,
-                                plotflag=False, 
-                                precondflag=PRECOND,
-                                diffkernel=KERNEL,
-                                u0=np.append([0],np.diff(gmin)),
-                                cgtol = 1e-4)
-                ddGmin = dGmin
-                # future : change find peak method that is not super presently                
-                peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-                peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
-                peaks = np.concatenate((peaks, peaks2), axis=None)
+                df['gmin'] = gmin
+                peaks, X_peaks, Xpeaks_int = self._change_det(df, COL_Y='gmin', mode = 'diff') # re
+                # dGmin = TVRegDiff(data=gmin ,itern=ITERN, 
+                #                 alph=_ALPH2, dx=dX, 
+                #                 ep=_EP2,
+                #                 scale=SCALE ,
+                #                 plotflag=False, 
+                #                 precondflag=PRECOND,
+                #                 diffkernel=KERNEL,
+                #                 u0=np.append([0],np.diff(gmin)),
+                #                 cgtol = 1e-4)
+                # ddGmin = dGmin
+                # # future : change find peak method that is not super presently                
+                # peaks, _ = find_peaks(ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                # peaks2, _ = find_peaks(-ddGmin, distance=DIST, prominence = np.max(ddGmin)/PROM)
+                # peaks = np.concatenate((peaks, peaks2), axis=None)
 
-                self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+                # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = ddGmin, peaks=peaks)   
+                # self._plot_tvregdiff(_X=_X[:], _y=gmin[:], _y2 = gmin, peaks=peaks)   
+
                 print('''
                     Do you want to keep this parameters for conductance computation ?
 
@@ -1205,14 +1369,17 @@ class ParseTreeFolder():
         df['gmin'] = gmin
         
         #df['d_gmin'] =  ['NA']+ddGmin.tolist()
-        df['d_gmin'] =  ddGmin
+        df['d_gmin'] =  'None'
 
         #print(df)
         if len(peaks)>0:
             try:
-                df['Peaks'] = np.array_str(_X[peaks])
+                # df['Peaks'] = np.array_str(_X[peaks])
+                df['Peaks'] = np.array_str(X_peaks)
             except:                
-                df['Peaks'] = ' '.join(map(str,peaks))
+                # df['Peaks'] = ' '.join(map(str,peaks))
+                df['Peaks'] = ' '.join(map(str,X_peaks))
+
         else:
             df['Peaks'] = 'NoPeak'
         assert self.df_save.columns.size ==  df.columns.size, 'size differs between df_save & df'
@@ -1232,6 +1399,8 @@ class ParseTreeFolder():
         li_all = []
         # future add a way to check the length of the columns section
         self.df_save = pd.DataFrame(columns = range(0,18))
+        self.df_value = None
+        self.df_rmse = None
         for d in np.arange(0,dimfolder):
             print('\n\n\n---------------------------------------------------------------------')
             print(d)
