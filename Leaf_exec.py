@@ -1,4 +1,5 @@
 #!/home/xavier/anaconda3/bin/python
+# python Leaf_exec.py -tr 2 -fr 1 -td 2 -fd 2 
 if __name__=="__main__":
 
 
