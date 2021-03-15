@@ -1086,7 +1086,7 @@ class ParseTreeFolder():
                             
                             try:
                                 _FRAC=0.1
-                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)) or FRAC_P2)
+                                FRAC_P2 = float(input('What is the frac value ? (current value : {}) '.format(_FRAC)) or _FRAC)
                                 _FRAC = FRAC_P2
                                 break
                             except ValueError:
