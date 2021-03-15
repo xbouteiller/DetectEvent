@@ -1,9 +1,43 @@
 # Python Program for computing leaf conductance and detecting curve's changing point
 
 
-Current version is: **0.6**
+Current version is: **1.0**
 
 <img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
+
+## What's new in this release ?
+
+### Major changes
+- RMSE change detection method is implemented on differentiated signal
+- Arg parser was added : It can be used in order to change manually some parameters before computation
+
+### Example of uses
+Good results was obtained with the following :
+
+>
+> python Leaf_exec.py -tr 4 -fr 2 -td 2 -fd 2 
+>
+
+This represents for 
+
+- the 'raw' signal :
+    - transformation of the raw measures with a log(y) when fitting model from the end to the start & and 1/exp(y) when fitting model from the start to the end
+    - model fitted is only a linear regression 
+
+- the 'differentiated' signal :
+    - transformation of the raw measures with a log(y) when fitting model from the end to the start & and no transformation when fitting model from the start to the end
+    - model fitted is only a linear regression 
+
+In order to get the original functionning of the program (i.e. no data transformation & A*expt-B*t fitted when fitting model from start to end):
+>
+> python Leaf_exec.py -tr 1 -fr 1 -td 1 -fd 1
+>
+
+or
+
+>
+> python Leaf_exec.py  
+>
 
 
 ## Install Python version if needed
