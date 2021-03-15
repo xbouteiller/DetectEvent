@@ -512,8 +512,8 @@ class ParseTreeFolder():
                 score = [self._fit_and_pred(X[Xend-s:Xend], y[Xend-s:Xend], mode, mode2) 
                         for s in start]    
 
-                print('length of lin score: ', len(score))
-                print('length of lin mean_start: ', len(mean_start))
+                # print('length of lin score: ', len(score))
+                # print('length of lin mean_start: ', len(mean_start))
         if mode == 'exp':
             # X position of sliding window increment
             if mode2=='raw':
@@ -567,8 +567,8 @@ class ParseTreeFolder():
                     score = [self._fit_and_pred(X[0:s], y[0:s], mode, mode2, bound) 
                             for s in start]
 
-                print('length of exp score: ', len(score))
-                print('length of exp mean_start: ', len(mean_start))
+                # print('length of exp score: ', len(score))
+                # print('length of exp mean_start: ', len(mean_start))
             except:
                 #raise Exception('Failed to fit Exponential curve')
 
@@ -586,7 +586,7 @@ class ParseTreeFolder():
     def _print_fit_parameters(self, mode2):
 
         if mode2 == 'raw':
-            print('\n-------------------\nmode is raw data')
+            print('\n-------------------\nRaw data')
             if self.transfo_rmse == '1':
                 print('no transformation applied en data')
             elif self.transfo_rmse == '2':
@@ -597,12 +597,12 @@ class ParseTreeFolder():
                 print('lin part was log transformed & exp part was 1/exp transformed')
 
             if self.fit_exp_rmse == '1':
-                print('\nA+exp-B*t was fitted on exponential part')
+                print('\nA+exp-B*t was fitted on exponential part\n')
             else :
                 print('linear model was fitted on exponential part\n')
        
         if mode2 == 'diff':
-            print('\n-------------------\nmode is diff data')
+            print('\n-------------------\nDifferentiated data')
             if self.transfo_diff == '1':
                 print('no transformation applied en data')
             elif self.transfo_diff == '2':
@@ -613,7 +613,7 @@ class ParseTreeFolder():
                 print('lin part was log transformed & exp part was 1/exp transformed')
 
             if self.fit_exp_diff == '1':
-                print('\nA+exp-B*t was fitted on exponential part')
+                print('\nA+exp-B*t was fitted on exponential part\n')
             else :
                 print('linear model was fitted on exponential part\n')
         
