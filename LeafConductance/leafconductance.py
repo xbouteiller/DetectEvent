@@ -370,11 +370,16 @@ class ParseTreeFolder():
             # print('log y')
             #print('log y')
             if mode2 == 'raw':
+                # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_rmse == '2' or self.transfo_rmse == '4':
                     yarr = np.log(yarr+1)
                     #print('transfo y lin')
+                    # 
+                    # 
+            # for differentiated data
 
             if mode2 == 'diff':
+                # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_diff == '2' or self.transfo_diff == '4':
                     yarr = 1/np.exp(yarr)
                     #print('transfo y lin')
@@ -407,25 +412,28 @@ class ParseTreeFolder():
 
             if mode2 == 'raw':
 
-
+                # linear regression OR exp fit A*exp-B*t can be used
                 if self.fit_exp_rmse == '2':
                     #print('linear reg')
                     Xarr = np.array(X).reshape(-1,1) # 
                     yarr = np.array(y).reshape(-1,1)
                     
+                    # 1/exp data for the exp phase of the fit only if 3 or 4 were chosen
                     if self.transfo_rmse == '3' or self.transfo_rmse == '4':
                         #print('transfo y exp')
                         yarr = 1/np.exp(yarr)#1/np.exp(yarr)              
 
                     reg = LinearRegression().fit(Xarr, yarr)
                     pred = reg.predict(Xarr)
-                    
+
+                # linear regression OR exp fit A*exp-B*t can be used
                 elif self.fit_exp_rmse == '1':
                     #print('CF reg')
 
                     Xarr = np.array(X).reshape(-1) # 
                     yarr = np.array(y).reshape(-1)
-
+                       
+                    # 1/exp data for the exp phase of the fit only if 3 or 4 were chosen
                     if self.transfo_rmse == '3' or self.transfo_rmse == '4':
                         #print('transfo y exp')
                         yarr = 1/np.exp(yarr)#1/np.exp(yarr) 
@@ -434,8 +442,10 @@ class ParseTreeFolder():
                     A, B = reg     
                     pred = A * np.exp(-B * Xarr)
 
+            # for differentiated data
             if mode2 == 'diff':
-
+                
+                # linear regression OR exp fit A*exp-B*t can be used
                 if self.fit_exp_diff == '2':
                     #print('linear reg')
 
@@ -447,6 +457,8 @@ class ParseTreeFolder():
                     
                     reg = LinearRegression().fit(Xarr, yarr)
                     pred = reg.predict(Xarr)
+                
+                # linear regression OR exp fit A*exp-B*t can be used
                 elif self.fit_exp_diff == '1':
                     #print('CF reg')
 
