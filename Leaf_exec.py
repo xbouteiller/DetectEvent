@@ -57,6 +57,27 @@ if __name__=="__main__":
                         choices = ["abs", "sq"],
                         type = str)
 
+    parser.add_argument('-tr','--transfo_rmse', default='1', 
+                        help='which method to use for transformating data\n1. None\n2.log lin\n3. 1/exp exp\n.4. log lin & 1/exp exp', 
+                        choices = ["1", "2", '3', '4'],
+                        type = str)
+
+    parser.add_argument('-td','--transfo_diff', default='1', 
+                        help='which method to use for transformating data\n1. None\n2.log lin\n3. 1/exp exp\n.4. log lin & 1/exp exp', 
+                        choices = ["1", "2", '3', '4'],
+                        type = str)
+
+    parser.add_argument('-fr','--fit_exp_rmse', default='1', 
+                            help='which method to use for fitting exponential part\n1. A*exp-B*t\2. lin', 
+                            choices = ["1", "2"],
+                            type = str)
+
+    parser.add_argument('-fd','--fit_exp_diff', default='1', 
+                        help='which method to use for fitting exponential part\n1. A*exp-B*t\2. lin', 
+                        choices = ["1", "2"],
+                        type = str)
+
+
     args = parser.parse_args()
 
 
@@ -74,6 +95,12 @@ if __name__=="__main__":
     alpha = args.alpha
     epsilon = args.epsilon
     diff_method = args.diff_method
+
+    transfo_rmse = args.transfo_rmse
+    transfo_diff = args.transfo_diff
+
+    fit_exp_rmse = args.fit_exp_rmse
+    fit_exp_diff = args.fit_exp_diff
 
     print('\n')
     print('Parametrizable parameters are :')
@@ -95,7 +122,11 @@ if __name__=="__main__":
                                    iter_n = iter_n,
                                    alpha = alpha,
                                    epsilon = epsilon,
-                                   diff_method = diff_method
+                                   diff_method = diff_method,
+                                   transfo_rmse = transfo_rmse,
+                                   transfo_diff = transfo_diff,
+                                   fit_exp_rmse = fit_exp_rmse,
+                                   fit_exp_diff = fit_exp_diff
                                   )
     parse_folder.parse_folder()
     

@@ -124,7 +124,11 @@ class ParseTreeFolder():
                 iter_n,
                 alpha,
                 epsilon,
-                diff_method):
+                diff_method,
+                transfo_rmse,
+                transfo_diff,
+                fit_exp_rmse,
+                fit_exp_diff):
 
         import time
         # super().__init__()
@@ -144,6 +148,12 @@ class ParseTreeFolder():
         self.ALPH = alpha
         self.EP = epsilon
         self.KERNEL = diff_method
+
+        self.transfo_rmse = transfo_rmse
+        self.transfo_diff = transfo_diff
+
+        self.fit_exp_rmse = fit_exp_rmse
+        self.fit_exp_diff = fit_exp_diff
 
         # global class variables
         self.global_score = []
@@ -350,45 +360,106 @@ class ParseTreeFolder():
 
 
         '''
+
+
+
         if mode == 'linear':
             Xarr = np.array(X).reshape(-1,1)
             yarr = np.array(y).reshape(-1,1)
             
             # print('log y')
-            print('log y')
-            yarr = np.log(yarr)
+            #print('log y')
+            if mode2 == 'raw':
+                if self.transfo_rmse == '2' or self.transfo_rmse == '4':
+                    yarr = np.log(yarr+1)
+                    #print('transfo y lin')
 
-            sample_weight = np.ones(yarr.size) 
+            if mode2 == 'diff':
+                if self.transfo_diff == '2' or self.transfo_diff == '4':
+                    yarr = 1/np.exp(yarr)
+                    #print('transfo y lin')
+            
             if mode2 == 'raw' or mode2 == 'diff':              
-                reg = LinearRegression().fit(Xarr, yarr, sample_weight)
+                reg = LinearRegression().fit(Xarr, yarr)
                 pred = reg.predict(Xarr)
 
         if mode == 'exp':
-            Xarr = np.array(X).reshape(-1) # REMOVE THE , -1 WARNING
-            yarr = np.array(y).reshape(-1)
+            # Xarr = np.array(X).reshape(-1) # REMOVE THE , -1 WARNING
+            # yarr = np.array(y).reshape(-1)
 
             # print('sqrt y')
             # yarr = np.sqrt(yarr)
 
             #--------------------------------------------------------------------
-            # Xarr = np.array(X).reshape(-1,1) # 
-            # yarr = np.array(y).reshape(-1,1)
-            # sample_weight = np.ones(yarr.size)
+            #Xarr = np.array(X)#.reshape(-1,1) # 
+            #yarr = np.array(y)#.reshape(-1,1)
+            #sample_weight = np.ones(yarr.size)
             
-            # print('exp y')
-            # yarr = 1/(np.exp(yarr))
-            # reg = LinearRegression().fit(Xarr, yarr, sample_weight)
-            # pred = reg.predict(Xarr)
-            #--------------------------------------------------------------------
-            if mode2 == 'raw' or mode2 == 'diff':
-                reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
-                A, B = reg     
-                pred = A * np.exp(-B * Xarr)   
-            # it would be eventually possible to define a neww function for the curve fit regression for the exponential part of the derivated signal
+            # # print(yarr)
+            # if mode2 == 'raw':
+            #     if self.transfo_rmse == '3' or self.transfo_rmse == '4':
+            #         yarr = 1/np.exp(yarr)
             # if mode2 == 'diff':
-            #     reg = curve_fit(self._func_d, Xarr, yarr, bounds=args[0])[0]                                       
-            #     A, B = reg     
-            #     pred = A* np.exp(-B * Xarr)
+            #     if self.transfo_diff == '3' or self.transfo_diff == '4':
+            #         yarr = 1/np.exp(yarr)
+
+            # print(yarr)
+
+            if mode2 == 'raw':
+
+
+                if self.fit_exp_rmse == '2':
+                    #print('linear reg')
+                    Xarr = np.array(X).reshape(-1,1) # 
+                    yarr = np.array(y).reshape(-1,1)
+                    
+                    if self.transfo_rmse == '3' or self.transfo_rmse == '4':
+                        #print('transfo y exp')
+                        yarr = 1/np.exp(yarr)#1/np.exp(yarr)              
+
+                    reg = LinearRegression().fit(Xarr, yarr)
+                    pred = reg.predict(Xarr)
+                    
+                elif self.fit_exp_rmse == '1':
+                    #print('CF reg')
+
+                    Xarr = np.array(X).reshape(-1) # 
+                    yarr = np.array(y).reshape(-1)
+
+                    if self.transfo_rmse == '3' or self.transfo_rmse == '4':
+                        #print('transfo y exp')
+                        yarr = 1/np.exp(yarr)#1/np.exp(yarr) 
+
+                    reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
+                    A, B = reg     
+                    pred = A * np.exp(-B * Xarr)
+
+            if mode2 == 'diff':
+
+                if self.fit_exp_diff == '2':
+                    #print('linear reg')
+
+                    Xarr = np.array(X).reshape(-1,1) # 
+                    yarr = np.array(y).reshape(-1,1)
+                    if self.transfo_diff == '3' or self.transfo_diff == '4':
+                        yarr = 1/np.exp(yarr)
+                        #print('transfo y exp')
+                    
+                    reg = LinearRegression().fit(Xarr, yarr)
+                    pred = reg.predict(Xarr)
+                elif self.fit_exp_diff == '1':
+                    #print('CF reg')
+
+                    Xarr = np.array(X).reshape(-1) # 
+                    yarr = np.array(y).reshape(-1)
+
+                    if self.transfo_diff == '3' or self.transfo_diff == '4':
+                        yarr = 1/np.exp(yarr)
+                        #print('transfo y exp')
+
+                    reg = curve_fit(self._func, Xarr, yarr, bounds=args[0])[0]
+                    A, B = reg     
+                    pred = A * np.exp(-B * Xarr) 
 
         rmse = self._RMSE(pred, yarr)
         return rmse
@@ -403,9 +474,14 @@ class ParseTreeFolder():
         mode2 : raw signal or derivated signal
         '''
 
+
+        self._print_fit_parameters( mode2 = mode2)
+
         # parameters to avoid exceed data boundaries
         Xend = np.shape(X)[0]
         Xmax = np.shape(X)[0]-lag-1
+
+
 
         # coordinates of the sliding window
 
@@ -480,7 +556,8 @@ class ParseTreeFolder():
             #                 for s in start]
             # print('score', score)
             # input()
-
+            # [self._fit_and_pred(X[0:s], y[0:s], mode, mode2, bound) 
+            #                 for s in start]
             try:
                 # do the exp fit
                 # curve fit from scipy is embedded within _fit_and_pred
@@ -505,6 +582,44 @@ class ParseTreeFolder():
         score = self._min_max(score)
         #print('{} score'.format(mode), score)
         return score, mean_start
+
+    def _print_fit_parameters(self, mode2):
+
+        if mode2 == 'raw':
+            print('\n-------------------\nmode is raw data')
+            if self.transfo_rmse == '1':
+                print('no transformation applied en data')
+            elif self.transfo_rmse == '2':
+                print('lin part was log transformed')
+            elif self.transfo_rmse == '3':
+                print('exp part was 1/exp transformed')
+            else:
+                print('lin part was log transformed & exp part was 1/exp transformed')
+
+            if self.fit_exp_rmse == '1':
+                print('\nA+exp-B*t was fitted on exponential part')
+            else :
+                print('linear model was fitted on exponential part\n')
+       
+        if mode2 == 'diff':
+            print('\n-------------------\nmode is diff data')
+            if self.transfo_diff == '1':
+                print('no transformation applied en data')
+            elif self.transfo_diff == '2':
+                print('lin part was log transformed')
+            elif self.transfo_diff == '3':
+                print('exp part was 1/exp transformed')
+            else:
+                print('lin part was log transformed & exp part was 1/exp transformed')
+
+            if self.fit_exp_diff == '1':
+                print('\nA+exp-B*t was fitted on exponential part')
+            else :
+                print('linear model was fitted on exponential part\n')
+        
+        time.sleep(1)
+            
+            
 
 
     def _func(self, x, a, b):
@@ -809,8 +924,8 @@ class ParseTreeFolder():
                 _wind = int(df.shape[0]/10)
                 _lag = 1# int(df.shape[0]/4)
             else:
-                _wind = max(int(df.shape[0]/100),int(1))
-                _lag = max(int(df.shape[0]/50),int(1))
+                _wind = max(int(df.shape[0]/WIND_DIV),int(1))
+                _lag = max(int(df.shape[0]/LAG_DIV),int(1))
 
         _X = df['delta_time'].copy().values
 
@@ -838,7 +953,7 @@ class ParseTreeFolder():
         score_l, mean_start_l = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'linear', mode2 = mode)
         score_e, mean_start_e = self._sliding_window_pred(_X, _y, window=_wind, lag=_lag, mode = 'exp', mode2 = mode)
 
-        print("Before exception ", score_l, mean_start_l, score_e, mean_start_e )
+        # print("Before exception ", score_l, mean_start_l, score_e, mean_start_e )
 
         # create an empty df for rmse values
         if self.df_rmse is None:
