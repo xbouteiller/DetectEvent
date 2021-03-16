@@ -12,13 +12,13 @@ Current version is: **1.0**
 - Arg parser was added : It can be used in order to change manually some parameters before computation
 
 ### Example of uses
-Good results was obtained with the following :
+Good results was obtained with the following configuration:
 
 >
 > python Leaf_exec.py -tr 4 -fr 2 -td 2 -fd 2 
+> python Leaf_exec.py --transfo_rmse 4 --fit_rmse 2 --transfo_diff 2 --fit_diff 2 
 >
-
-This represents for 
+That's mean:
 
 - the 'raw' signal :
     - transformation of the raw measures with a log(y) when fitting model from the end to the start & and 1/exp(y) when fitting model from the start to the end
@@ -28,7 +28,7 @@ This represents for
     - transformation of the raw measures with a log(y) when fitting model from the end to the start & and no transformation when fitting model from the start to the end
     - model fitted is only a linear regression 
 
-In order to get the original functionning of the program (i.e. no data transformation & A*expt-B*t fitted when fitting model from start to end):
+In order to get the original method of the program (i.e. no data transformation & A*expt-B*t fitted when fitting model from start to end):
 >
 > python Leaf_exec.py -tr 1 -fr 1 -td 1 -fd 1
 >
