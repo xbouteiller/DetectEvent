@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V1.0              ---------------------')
+print('---------------                  V1.1              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -372,6 +372,7 @@ class ParseTreeFolder():
             if mode2 == 'raw':
                 # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_rmse == '2' or self.transfo_rmse == '4':
+                    # Xarr = (Xarr+0.1)
                     yarr = np.log(yarr+1)
                     #print('transfo y lin')
                     # 
@@ -421,6 +422,7 @@ class ParseTreeFolder():
                     # 1/exp data for the exp phase of the fit only if 3 or 4 were chosen
                     if self.transfo_rmse == '3' or self.transfo_rmse == '4':
                         #print('transfo y exp')
+                        # Xarr = 1/(Xarr+0.1) ## TRY TO INVERT X 
                         yarr = 1/np.exp(yarr)#1/np.exp(yarr)              
 
                     reg = LinearRegression().fit(Xarr, yarr)
@@ -1183,10 +1185,23 @@ class ParseTreeFolder():
             self.df_rmse = None
             self.df_value = None
             print('parsing list of files from : {}'.format(self.presentfile))
-            if not os.path.exists('output_files'):
-                os.makedirs('output_files')
+
+            starting_name = 'output_files'
+            i = 0
+            while True:
+                i+=1
+                temp_name = starting_name+'_'+str(i)
+                if not os.path.exists(temp_name):
+                    os.makedirs(temp_name)
+                    break
+
+            self.rep_name = temp_name
+            print('Saving to : ', temp_name)
+            temp_name += '/'
+            
 
             list_of_df = []
+   
 
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
@@ -1201,27 +1216,30 @@ class ParseTreeFolder():
                     # remove the .csv extension from the name
                     temp_folder = os.path.splitext(str(os.path.basename(elem)))[0]
 
-                    if not os.path.exists('output_files/' + temp_folder ):
-                        os.makedirs('output_files/' + temp_folder)
+                    if not os.path.exists(temp_name + temp_folder ):
+                        os.makedirs(temp_name + temp_folder)
                     # concat df
                     temp_df = pd.concat([temp_df,temp_df2], axis = 1)
                     temp_df['Campaign'] = temp_folder
 
+                    # NEW ##
+                    temp_df['fit_mode'] = self.fit_exp_rmse
+                    temp_df['transfo_mode'] = self.transfo_rmse
                     # append df to list
                     list_of_df.append(temp_df)
-                    temp_df.to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem))) 
+                    temp_df.to_csv(temp_name + temp_folder + '/RMSE_detection_' + str(os.path.basename(elem))) 
                     #pd.concat([temp_df,temp_df2], axis = 1).to_csv('output_files/'+ temp_folder + '/RMSE_detection_' + str(os.path.basename(elem)))                 
                                         
-                    self.df_rmse.to_csv('output_files/'+ temp_folder + '/RMSE_score_'+str(os.path.basename(elem)))
-                    self.df_value.to_csv('output_files/'+ temp_folder + '/RMSE_df_complete_'+str(os.path.basename(elem)))
+                    self.df_rmse.to_csv(temp_name+ temp_folder + '/RMSE_score_'+str(os.path.basename(elem)))
+                    self.df_value.to_csv(temp_name+ temp_folder + '/RMSE_df_complete_'+str(os.path.basename(elem)))
                     self.df_rmse = None
                     self.df_value = None
                     self.global_score = []
 
             # save the appended df in a global file
             # explode remove the square bracket [] from cells and convert to multiline
-            pd.concat(list_of_df).reset_index().explode('Change_points').to_csv('output_files/'+'RMSE_df_complete_full.csv')
-            pd.concat(list_of_df).reset_index().explode('Change_points').drop_duplicates(subset=['Campaign','index','Sample_ID','slope']).to_csv('output_files/'+'RMSE_df_complete_full_No_duplicates.csv')
+            pd.concat(list_of_df).reset_index().explode('Change_points').to_csv(temp_name+'RMSE_df_complete_full.csv')
+            pd.concat(list_of_df).reset_index().explode('Change_points').drop_duplicates(subset=['Campaign','index','Sample_ID','slope']).to_csv(temp_name+'RMSE_df_complete_full_No_duplicates.csv')
                 
         
     def _plot_tvregdiff(self, _X, _y, _y2, peaks, ax2_Y =r'$Gmin (mmol.m^{-2}.s^{-1})$', ax2_label = 'Gmin' , manual_selection=False, Npoints=1):
@@ -1491,9 +1509,33 @@ class ParseTreeFolder():
                     dffile = self._robust_import(elem)
                     self._parse_samples(dffile = dffile, FUNC = self._tvregdiff)
         
-        if not os.path.exists('output_files'):
-                os.makedirs('output_files')
-        self.df_save.to_csv('output_files/gmin.csv')
+        
+        # NEW ##
+        self.df_save['fit_mode'] = self.fit_exp_diff
+        self.df_save['transfo_mode'] = self.transfo_diff
+        try:
+            self.df_save.to_csv(self.rep_name + '/gmin.csv')
+        except:
+            print('rep not found creating rep')
+            self.rep_name = 'None'
+
+        if self.rep_name == 'None':
+            starting_name = 'output_files'
+            i = 0
+            while True:
+                i+=1
+                temp_name = starting_name+'_'+str(i)
+                if not os.path.exists(temp_name):
+                    os.makedirs(temp_name)
+                    break
+            
+            print('Saving to : ', temp_name)
+            temp_name += '/'
+            self.df_save.to_csv(temp_name + 'gmin.csv')
+
+
+
+        
 
 
 
