@@ -16,6 +16,7 @@ Good results was obtained with the following configuration:
 
 >
 > python Leaf_exec.py -tr 4 -fr 2 -td 2 -fd 2 
+> 
 > python Leaf_exec.py --transfo_rmse 4 --fit_rmse 2 --transfo_diff 2 --fit_diff 2 
 >
 That's mean:
