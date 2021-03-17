@@ -1032,11 +1032,26 @@ class ParseTreeFolder():
         df_temp_rmse = pd.DataFrame({'Sample':self.sample, 'RMSE_lin':score_l, 'Time_lin':mean_start_l, 'RMSE_exp':score_e, 'Time_exp':mean_start_e})        
         self.df_rmse = pd.concat([self.df_rmse, df_temp_rmse], axis = 0, ignore_index = True)
         
+        # plt.scatter(mean_start_e,score_e)
+        # plt.scatter(mean_start_l,score_l)
+        # plt.show()
+
+        # print(df.dtypes)
+        # self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df, mode = mode)
+
         try:
             idx, Xidx, Xidx_int = self._detect_crossing_int(Ylin=score_l, Yexp=score_e, Xl= mean_start_l, Xe= mean_start_e, df = df, mode = mode) #Yexp, Ylin, Xl, Xe
-            return idx, Xidx, Xidx_int 
+            return idx, Xidx, Xidx_int
+        except OSError as err:
+            print("OS error: {0}".format(err))
+        except ValueError as verr:
+            print("ValueError error: {0}".format(verr))
+        except TypeError as typ:
+            print("TypeError error: {0}".format(typ))
         except:
-            print('detect crossing failed, probable cause is that more than 1 crossing were detected')
+            print("Unexpected error:", sys.exc_info()[0])
+        finally:
+            print('Detect crossing failed, return Failed value within the data frame')
             try:
                 plt.close()
             except:
