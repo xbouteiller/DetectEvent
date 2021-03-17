@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V1.1              ---------------------')
+print('---------------                  V1.2              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -772,7 +772,10 @@ class ParseTreeFolder():
             # ax1 : raw signal
             ax1.set_xlabel('time (min)')
             ax1.set_ylabel(self.sample, color=color)
-            ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+            if mode == 'raw':
+                ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Weight (g)')
+            if mode == 'diff':
+                ax1.plot(self.Xselected, self.yselected, color=color, linestyle='-', marker='.', label = 'Differentiated signal (G)')
             ax1.tick_params(axis='y', labelcolor=color)
             color = 'tab:red'
             # ax1 : smoothed signal
@@ -807,9 +810,35 @@ class ParseTreeFolder():
             ax2.legend(loc='right')
             fig.tight_layout()
 
+            try:
+                self.fig_folder
+            except:
+                self.fig_folder = 'None'
+
+            if self.fig_folder == 'None':
+                starting_name = 'output_fig'
+                i = 0
+                while True:
+                    i+=1
+                    fig_folder = starting_name+'_'+str(i)
+                    if not os.path.exists(fig_folder):
+                        os.makedirs(fig_folder)
+                        os.makedirs(fig_folder+'/'+'rmse')
+                        os.makedirs(fig_folder+'/'+'diff')
+                        break
+                self.fig_folder = fig_folder                
+
+            if mode == 'raw':
+                figname = self.fig_folder + '/' + 'rmse' + '/' + self.sample + '.png'
+                plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
+            if mode == 'diff':
+                figname = self.fig_folder + '/' + 'diff' + '/' + self.sample + '.png'
+                plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
+
             # close the graph on a click
             # plt.pause(PAUSE_GRAPH)
             plt.waitforbuttonpress(0)
+
             # input()
             plt.close()   
 
@@ -904,7 +933,32 @@ class ParseTreeFolder():
                                 ax1.plot(Xreg, fitted_values, c = colors['black'], lw = 2)
                             else:
                                 print('unable to fit regression')
-                        
+
+                        try:
+                            self.fig_folder
+                        except:
+                            self.fig_folder = 'None'
+
+                        if self.fig_folder == 'None':
+                            starting_name = 'output_fig'
+                            i = 0
+                            while True:
+                                i+=1
+                                fig_folder = starting_name+'_'+str(i)
+                                if not os.path.exists(fig_folder):
+                                    os.makedirs(fig_folder)
+                                    os.makedirs(fig_folder+'/'+'rmse')
+                                    os.makedirs(fig_folder+'/'+'diff')
+                                    break
+                            self.fig_folder = fig_folder                
+
+                        if mode == 'raw':
+                            figname = self.fig_folder + '/' + 'rmse' + '/' + self.sample + '.png'
+                            plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
+                        if mode == 'diff':
+                            figname = self.fig_folder + '/' + 'diff' + '/' + self.sample + '.png'
+                            plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
+
                         plt.waitforbuttonpress(0)      
                         plt.close()
                         First_pass+=1
@@ -1186,16 +1240,23 @@ class ParseTreeFolder():
             self.df_value = None
             print('parsing list of files from : {}'.format(self.presentfile))
 
-            starting_name = 'output_files'
-            i = 0
-            while True:
-                i+=1
-                temp_name = starting_name+'_'+str(i)
-                if not os.path.exists(temp_name):
-                    os.makedirs(temp_name)
-                    break
+            try:
+                temp_name = self.rep_name                
+            except:
+                self.rep_name = 'None'
+            
+            if self.rep_name == 'None':
+                starting_name = 'output_files'
+                i = 0
+                while True:
+                    i+=1
+                    temp_name = starting_name+'_'+str(i)
+                    if not os.path.exists(temp_name):
+                        os.makedirs(temp_name)
+                        break
 
-            self.rep_name = temp_name
+                self.rep_name = temp_name
+
             print('Saving to : ', temp_name)
             temp_name += '/'
             
@@ -1282,6 +1343,28 @@ class ParseTreeFolder():
         fig.tight_layout()
         if manual_selection:
             selected_points=fig.ginput(Npoints)
+
+
+        try:
+            self.fig_folder
+        except:
+            self.fig_folder = 'None'
+
+        if self.fig_folder == 'None':
+            starting_name = 'output_fig'
+            i = 0
+            while True:
+                i+=1
+                fig_folder = starting_name+'_'+str(i)
+                if not os.path.exists(fig_folder):
+                    os.makedirs(fig_folder)
+                    os.makedirs(fig_folder+'/'+'rmse')
+                    os.makedirs(fig_folder+'/'+'diff')
+                    break
+            self.fig_folder = fig_folder                
+
+        figname = self.fig_folder + '/' + 'diff' + '/' + self.sample + '.png'
+        plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
         # plt.pause(PAUSE_GRAPH)
         #plt.show()
         plt.waitforbuttonpress(0)
@@ -1372,11 +1455,11 @@ class ParseTreeFolder():
 
             1: Yes or exit
             2: No, I want to adjust regularization parameters
-            3: No, I want to select peaks manually           
+            3: No, I want to select peaks manually (- deactivated -)   
                     
             ''') 
 
-        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2', '3'))
+        what_to_do = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2')) #option '3' removed
         ########################################################################
         # keep the firt detected peak to avoid slice issues
         peaks_0 = peaks
@@ -1401,7 +1484,7 @@ class ParseTreeFolder():
 
 
                 print('''
-                        Do you want to work on keep this parameters for conductance computation ?
+                        Do you want to keep this parameters for conductance computation ?
 
                         1: Yes or exit
                         2: No, I want to adjust regularization parameters

@@ -61,12 +61,12 @@ if __name__=="__main__":
                         type = str)
 
     parser.add_argument('-tr','--transfo_rmse', default='1', 
-                        help='which method to use for transformating data\n1. None\n2.log lin\n3. 1/exp exp\n.4. log lin & 1/exp exp', 
+                        help='which method to use for transformating data\n1. None\n2.log lin\n3. exp part exp\n.4. log lin & exp exp', 
                         choices = ["1", "2", '3', '4'],
                         type = str)
 
     parser.add_argument('-td','--transfo_diff', default='1', 
-                        help='which method to use for transformating data\n1. None\n2.log lin\n3. 1/exp exp\n.4. log lin & 1/exp exp', 
+                        help='which method to use for transformating data\n1. None\n2.log lin\n3. exp part exp\n.4. log lin & exp exp', 
                         choices = ["1", "2", '3', '4'],
                         type = str)
 
