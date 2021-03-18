@@ -1,7 +1,7 @@
 # Python Program for computing leaf conductance and detecting curve's changing point
 
 
-Current version is: **1.2**
+Current version is: **1.3**
 
 <img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
 
