@@ -1044,13 +1044,30 @@ class ParseTreeFolder():
             return idx, Xidx, Xidx_int
         except OSError as err:
             print("OS error: {0}".format(err))
+            try:
+                plt.close()
+            except:
+                pass
+            self.global_score.append([self.sample, 'Failed', 'Failed', 'Failed', 'Failed', ['', '', '', '', '', '']])
+
         except ValueError as verr:
             print("ValueError error: {0}".format(verr))
+            try:
+                plt.close()
+            except:
+                pass
+            self.global_score.append([self.sample, 'Failed', 'Failed', 'Failed', 'Failed', ['', '', '', '', '', '']])
+
         except TypeError as typ:
             print("TypeError error: {0}".format(typ))
+            try:
+                plt.close()
+            except:
+                pass
+            self.global_score.append([self.sample, 'Failed', 'Failed', 'Failed', 'Failed', ['', '', '', '', '', '']])
+
         except:
             print("Unexpected error:", sys.exc_info()[0])
-        finally:
             print('Detect crossing failed, return Failed value within the data frame')
             try:
                 plt.close()
@@ -1626,7 +1643,8 @@ class ParseTreeFolder():
                 if not os.path.exists(temp_name):
                     os.makedirs(temp_name)
                     break
-            
+
+            self.rep_name = temp_name
             print('Saving to : ', temp_name)
             temp_name += '/'
             self.df_save.to_csv(temp_name + 'gmin.csv')
