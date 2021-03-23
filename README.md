@@ -1,7 +1,7 @@
 # Python Program for computing leaf conductance and detecting curve's changing point
 
 
-Current version is: **1.3**
+Current version is: **1.4**
 
 <img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
 
@@ -11,6 +11,8 @@ Current version is: **1.3**
 - RMSE change detection method is implemented on differentiated signal
 - Arg parser was added : It can be used in order to define manually some parameters before computation
 - Figures are atuomatically saved to output_fig folder
+
+- It is now possible to select only some ID from a file (2021/03/21)
 
 ### Example of uses
 Good results was obtained with the following configuration:
