@@ -163,12 +163,15 @@ class ParseTreeFolder():
         print('''
         WELCOME TO LEAFCONDUCTANCE
 
-        Press Enter to continue ...
-        
+        What do you want to do ?
+
+        1: Parse files from a folder
+        2: Parse unique ID        
         ''')
+        self.file_or_folder = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
+
         # fixed value for self.file_or_folder attribute, to be cleaned in the future
-        self.file_or_folder = '1'
-        input('')
+       
         # self.file_or_folder = self._get_valid_input('Type 1 to start : ', ('1'))
         if self.file_or_folder== '1':
             ################################################### REACTIVATE
@@ -191,6 +194,21 @@ class ParseTreeFolder():
             # self.method_choice = '2' 
             ################################################### REACTIVATE
             print('\n\n\nfile 1 path is {}'.format(self.path))
+
+        if self.file_or_folder== '2':
+            Tk().withdraw()
+            file = askopenfilename(title='What is the file that you want to check ?')
+            self.path = file.replace('/','/')
+            print('\n\n\nfile path is {}'.format(self.path))   
+
+            print('''
+            which method do you want to use for detecting conductance files ?
+
+            1: Detect all CSV files 
+            2: Detect string 'CONDUCTANCE' in the first row
+            ''')
+            self.method_choice = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))        
+
 
         # options allowed for the action method
         # in the future it could be useful to add a combo method that would do '1' & '2' in the same time
@@ -233,6 +251,9 @@ class ParseTreeFolder():
         import time
         import re
         import pandas as pd
+
+        if self.file_or_folder=='2':
+            self.listOfFiles=[[self.path]]
 
 
         if self.file_or_folder=='1':
@@ -373,7 +394,7 @@ class ParseTreeFolder():
                 # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_rmse == '2' or self.transfo_rmse == '4':
                     # Xarr = (Xarr+0.1)
-                    yarr = np.log(yarr+1)
+                    yarr = np.log(yarr+1)# 
                     #print('transfo y lin')
                     # 
                     # 
@@ -382,7 +403,7 @@ class ParseTreeFolder():
             if mode2 == 'diff':
                 # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_diff == '2' or self.transfo_diff == '4':
-                    yarr = 1/np.exp(yarr)
+                    yarr =  1/np.exp(yarr) #np.sqrt(yarr)# 
                     #print('transfo y lin')
             
             if mode2 == 'raw' or mode2 == 'diff':              
@@ -1224,17 +1245,94 @@ class ParseTreeFolder():
         should be relatively robust
         future : robustness could be improved
 
-        use parsefile class
+        use parsefile class        
         '''
-        if self.method_choice== '2':
-            skip=1
-        else:
-            skip=0
-        try:
-            dffile = ParseFile(path = elem, skipr=skip).clean_file()
-        except:
-            encodi='latin'
-            dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
+        if self.file_or_folder == '2':
+            
+            if self.method_choice== '2':                
+                skip=1
+            else:
+                skip=0
+
+            try:
+                dffile = ParseFile(path = elem, skipr=skip).clean_file()
+            except:
+                encodi='latin'
+                dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
+
+            if dffile.shape[1] == 1:
+                print('TRU*****************************************')
+                separ=';'
+                try:
+                    dffile = ParseFile(path = elem, sepa=separ, skipr=skip).clean_file()
+                except:
+                    encodi='latin'
+                    dffile = ParseFile(path = elem, skipr=skip, sepa=separ, encod=encodi).clean_file()
+        
+
+            uniqueid = dffile[self.SAMPLE_ID].unique()
+            print('''
+            Unique ID within selected file are: 
+            {}
+                     
+            '''.format(uniqueid))
+
+            #idtoanalyse = input("which one do you want to analyse ?")
+            listodidtoanalyse = []   
+            count = 0
+            
+
+            idtoanalyse = ''               
+
+            while True:
+                while ((idtoanalyse not in uniqueid) and (idtoanalyse not in ['exit', 'e'])):
+                    idtoanalyse = input("\nwhich ID do you want to analyse ?\nPlease select one among:\n{}\nEnter --exit-- to stop\n\nYour choice: ".format(uniqueid))
+                    # print('')
+
+                    # print(idtoanalyse)
+                    # print(idtoanalyse not in uniqueid)
+                    # print(idtoanalyse not in ['exit', 'e'])
+                    # print(((idtoanalyse not in uniqueid) or (idtoanalyse not in ['exit', 'e'])))
+                    # print(((idtoanalyse not in uniqueid) and (idtoanalyse not in ['exit', 'e'])))
+
+                # print(idtoanalyse, count)
+                if  idtoanalyse in uniqueid:
+                    print(' \nAppending : {}'.format(idtoanalyse))
+                    listodidtoanalyse.append(idtoanalyse)
+                    count += 1
+                    idtoanalyse = ''
+                       
+                elif (idtoanalyse == 'exit' or idtoanalyse == 'e'):
+                    if count>0:
+                        print(' \nExiting')
+                        break
+                    else:
+                        print('\nYou need to choose at least one ID before')
+                        idtoanalyse = ''
+
+               
+              
+            
+            boollistofid = [True if id in listodidtoanalyse else False for id in dffile[self.SAMPLE_ID] ]
+
+
+            dffile = dffile[boollistofid].copy()
+            print('\nselected ID are: {}'.format(dffile[self.SAMPLE_ID].unique()))
+                        
+
+
+
+
+        if self.file_or_folder == '1':
+            if self.method_choice== '2':
+                skip=1
+            else:
+                skip=0
+            try:
+                dffile = ParseFile(path = elem, skipr=skip).clean_file()
+            except:
+                encodi='latin'
+                dffile = ParseFile(path = elem, skipr=skip, encod=encodi).clean_file()
 
             if dffile.shape[1] == 1:
                 separ=';'
