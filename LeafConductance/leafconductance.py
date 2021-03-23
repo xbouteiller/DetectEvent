@@ -166,7 +166,7 @@ class ParseTreeFolder():
         What do you want to do ?
 
         1: Parse files from a folder
-        2: Parse unique ID        
+        2: Select some ID from a file
         ''')
         self.file_or_folder = self._get_valid_input('What do you want to do ? Choose one of : ', ('1','2'))
 
