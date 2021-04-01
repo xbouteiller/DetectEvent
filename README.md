@@ -11,20 +11,25 @@ Current version is: **1.5**
 
 
 ##### 2021/04/01
-- filter data file on Relative Water Content (RWC)
-- it is possible to define superior and inferior threshold for slicing data file based on RWC (default: 80% and 50%)
+- Data file are sliced based on Relative Water Content (RWC)
+- RWC = 100*((fresh-dry)/(saturated-dry))
+- It is possible to manually define superior and inferior threshold for slicing the data (default: 80% and 50%)
 >
-> python Leaf_exec.py --rwc_inf 20 --rwc_sup 90 #equivalent to 
+> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20 #similar to 
 > 
-> python Leaf_exec.py -ri 20 -rs 90
+> python Leaf_exec.py -rs 90 -ri 20
 >
 
 <img src="img/B22_LITU_BL_09.png" width="65%" height="65%">
 Eliminated data are highlighted in red
 
 
-Defined RWC threshold and corresponding time are stored within the recap .csv file
+- Defined RWC threshold and corresponding time are stored within the .csv recap file
+- if you want to keep the complete dataset you can choose to keep the valeus between RWC sup 100% and RWC inf 0%
 
+>
+> python Leaf_exec.py --rwc_sup 100 --rwc_inf 0 
+>
 
 
 ##### 2021/03/2021
