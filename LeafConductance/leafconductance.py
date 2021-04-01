@@ -128,7 +128,9 @@ class ParseTreeFolder():
                 transfo_rmse,
                 transfo_diff,
                 fit_exp_rmse,
-                fit_exp_diff):
+                fit_exp_diff,
+                rwc_sup,
+                rwc_inf):
 
         import time
         # super().__init__()
@@ -154,6 +156,9 @@ class ParseTreeFolder():
 
         self.fit_exp_rmse = fit_exp_rmse
         self.fit_exp_diff = fit_exp_diff
+
+        self.rwc_sup = rwc_sup
+        self.rwc_inf = rwc_inf
 
         # global class variables
         self.global_score = []
@@ -1146,12 +1151,16 @@ class ParseTreeFolder():
                 df = self._detect_outlier(df=df, thres =THRES)
 
             # transform time to TRUE date time
-            # df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
-            # # compute time delta between measures
-            # # WARNING : the points need to be regurlarly sampled with a constant frequency
-            # df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
-            # # convert time to minute
-            # df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+            try:
+                df['delta_time']
+            except:
+                print('delta time column is leaking ... computing ...')
+                df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
+                # compute time delta between measures
+                # WARNING : the points need to be regurlarly sampled with a constant frequency
+                df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+                # convert time to minute
+                df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
 
             ################# PUT HERE THE RWC METHOD
             #########################################
@@ -1347,7 +1356,7 @@ class ParseTreeFolder():
         return dffile
         
 
-    def _compute_rwc(self, df, nmean = 100, rwc_thressup = 80, rwc_thresinf = 50, visualise = True):      
+    def _compute_rwc(self, df, nmean = 100, rwc_thressup = self.rwc_sup, rwc_thresinf = self.rwc_inf, visualise = True):      
 
         from matplotlib.patches import Circle, Wedge, Polygon
 
@@ -1403,11 +1412,11 @@ class ParseTreeFolder():
             color = 'tab:red'
 
             verts = [[0, 0],[t80, 0], [t80, np.max(df[self.YVAR].values)] , [0, np.max(df[self.YVAR].values)]]
-            poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
+            poly = Polygon(verts, facecolor='r', alpha = 0.5)
             ax1.add_patch(poly)   
 
             verts = [[t50, 0],[np.max(df['delta_time'].values), 0], [np.max(df['delta_time'].values), np.max(df[self.YVAR].values)], [t50, np.max(df[self.YVAR].values)] ]
-            poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
+            poly = Polygon(verts, facecolor='r', alpha = 0.5)
             ax1.add_patch(poly)
 
 
@@ -1457,7 +1466,7 @@ class ParseTreeFolder():
         print('min : ', df.delta_time.min())
         print('max : ', df.delta_time.max())
 
-        return df
+        return df, t80, t50
 
        
 
@@ -1515,8 +1524,9 @@ class ParseTreeFolder():
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
                     dffile = self._robust_import(elem)          
-
-                    dffile = self._compute_rwc(dffile)
+                    
+                    # fit after rwc removal, if you want to use the full curve set tinf to 0 and tsup to 100
+                    dffile, t80, t50 = self._compute_rwc(dffile)
                     
                     # future : do i need to use global var as self.globalscore ... ?
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
@@ -1536,6 +1546,13 @@ class ParseTreeFolder():
                     # NEW ##
                     temp_df['fit_mode'] = self.fit_exp_rmse
                     temp_df['transfo_mode'] = self.transfo_rmse
+
+                    temp_df['percentage_rwc_sup']=self.rwc_sup
+                    temp_df['percentage_rwc_sup']=self.rwc_inf
+
+                    temp_df['time_rwc_sup']=t80
+                    temp_df['time_rwc_inf']=t50
+
                     # append df to list
                     list_of_df.append(temp_df)
                     temp_df.to_csv(temp_name + temp_folder + '/RMSE_detection_' + str(os.path.basename(elem))) 
