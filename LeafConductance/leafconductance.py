@@ -1146,12 +1146,15 @@ class ParseTreeFolder():
                 df = self._detect_outlier(df=df, thres =THRES)
 
             # transform time to TRUE date time
-            df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
-            # compute time delta between measures
-            # WARNING : the points need to be regurlarly sampled with a constant frequency
-            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
-            # convert time to minute
-            df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+            # df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
+            # # compute time delta between measures
+            # # WARNING : the points need to be regurlarly sampled with a constant frequency
+            # df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+            # # convert time to minute
+            # df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+
+            ################# PUT HERE THE RWC METHOD
+            #########################################
 
             self.Xselected = df['delta_time'].values
             self.yselected = df[self.YVAR].copy().values
@@ -1344,6 +1347,121 @@ class ParseTreeFolder():
         return dffile
         
 
+    def _compute_rwc(self, df, nmean = 100, rwc_thressup = 80, rwc_thresinf = 50, visualise = True):      
+
+        from matplotlib.patches import Circle, Wedge, Polygon
+
+        dry = np.mean(df[self.YVAR].values[-int(nmean):])
+        saturated = np.mean(df[self.YVAR].values[0])
+        rwc = 100*((df[self.YVAR].values-dry)/(saturated-dry))            
+
+        def find_nearest(a, a0):
+            "Element in nd array `a` closest to the scalar value `a0`"
+            idx = np.abs(a - a0).argmin()
+            
+            return a.flat[idx]  
+
+        rwc_sup = find_nearest(rwc, rwc_thressup)
+        rwc_inf = find_nearest(rwc, rwc_thresinf)  
+
+        print('Detected RWC SUP at t: {} min'.format(rwc_sup))
+        print('Detected RWC INF at t: {} min'.format(rwc_inf))
+
+
+
+        def compute_time_lag(df):
+            df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
+            # compute time delta between measures
+            # WARNING : the points need to be regurlarly sampled with a constant frequency
+            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+            # convert time to minute
+            df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+
+            return df
+        
+        df = compute_time_lag(df)
+
+        t80 = np.min(df.loc[rwc == rwc_sup, "delta_time"].values)
+        t50 = np.max(df.loc[rwc == rwc_inf, "delta_time"].values)
+
+        print('Detected RWC {} at {}'.format(rwc_thressup,t80))
+        print('Detected RWC {} at {}'.format(rwc_thresinf,t50))
+
+        TITLE = str(df[self.SAMPLE_ID].unique()[0])
+        if visualise:
+
+            
+            
+            fig, ax1 = plt.subplots()
+
+            plt.title(TITLE)
+            color = 'tab:blue'
+            ax1.set_xlabel('time (min)')
+            ax1.set_ylabel(TITLE + '\nWeight (g)', color=color)
+            ax1.plot(df['delta_time'], df[self.YVAR], color=color, linestyle='-', marker='.', label = 'data')
+            ax1.tick_params(axis='y', labelcolor=color)
+            color = 'tab:red'
+
+            verts = [[0, 0],[t80, 0], [t80, np.max(df[self.YVAR].values)] , [0, np.max(df[self.YVAR].values)]]
+            poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
+            ax1.add_patch(poly)   
+
+            verts = [[t50, 0],[np.max(df['delta_time'].values), 0], [np.max(df['delta_time'].values), np.max(df[self.YVAR].values)], [t50, np.max(df[self.YVAR].values)] ]
+            poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
+            ax1.add_patch(poly)
+
+
+            ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+            color = 'tab:green' 
+            ax2.set_ylabel('RWC (%)', color=color)  # we already handled the x-label with ax1
+            ax2.plot(df['delta_time'],  rwc, color=color, marker='.', label = 'RWC')
+            ax2.tick_params(axis='y', labelcolor=color)
+
+            # Make the shaded region
+                        
+            
+        try:
+            self.fig_folder
+        except:
+            self.fig_folder = 'None'
+
+        if self.fig_folder == 'None':
+            starting_name = 'output_fig'
+            i = 0
+            while True:
+                i+=1
+                fig_folder = starting_name+'_'+str(i)
+                if not os.path.exists(fig_folder):
+                    os.makedirs(fig_folder)
+                    os.makedirs(fig_folder+'/'+'rmse')
+                    os.makedirs(fig_folder+'/'+'diff')
+                    os.makedirs(fig_folder+'/'+'rwc')
+                    break
+            self.fig_folder = fig_folder                
+
+        figname = self.fig_folder + '/' + 'rwc' + '/' + TITLE + '.png'
+        plt.savefig(figname, dpi = 420, bbox_inches = 'tight')
+        # plt.pause(PAUSE_GRAPH)
+        #plt.show()
+        plt.waitforbuttonpress(0)
+        # input()
+        plt.close() 
+
+
+
+
+        print('Slicing df between RWC80 and RWC50')
+        # df = df[(rwc < rwc_thressup) & (rwc > rwc_thresinf)].copy()
+        df = df[ (df.delta_time.values <= t50) & (df.delta_time.values >= t80)].copy()
+
+        print('min : ', df.delta_time.min())
+        print('max : ', df.delta_time.max())
+
+        return df
+
+       
+
+
     def change_detection(self):
         '''
         parse all the files within the folder tree
@@ -1396,7 +1514,9 @@ class ParseTreeFolder():
 
             if self.presentfile != 'No file':
                 for elem in self.listOfFiles[d]:
-                    dffile = self._robust_import(elem)                    
+                    dffile = self._robust_import(elem)          
+
+                    dffile = self._compute_rwc(dffile)
                     
                     # future : do i need to use global var as self.globalscore ... ?
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)

@@ -2,6 +2,29 @@
 # python Leaf_exec.py -tr 4 -fr 2 -td 2 -fd 2 
 # python Leaf_exec.py --transfo_rmse 4 --fit_rmse 2 --transfo_diff 2 --fit_diff 2 
 
+
+def float_range(mini,maxi):
+    """Return function handle of an argument type function for 
+       ArgumentParser checking a float range: mini <= arg <= maxi
+         mini - maximum acceptable argument
+         maxi - maximum acceptable argument"""
+
+    # Define the function with default arguments
+    def float_range_checker(arg):
+        """New Type function for argparse - a float within predefined range."""
+
+        try:
+            f = float(arg)
+        except ValueError:    
+            raise argparse.ArgumentTypeError("must be a floating point number")
+        if f < mini or f > maxi:
+            raise argparse.ArgumentTypeError("must be in range [" + str(mini) + " .. " + str(maxi)+"]")
+        return f
+
+    # Return function handle to checking function
+    return float_range_checker
+
+
 if __name__=="__main__":
 
 
@@ -80,6 +103,14 @@ if __name__=="__main__":
                         choices = ["1", "2"],
                         type = str)
 
+    parser.add_argument('-rs','--rwc_sup', default=80, 
+                        help='upper percentage boundary of RWC [0 .. 100]',                         
+                        type=float_range(0,100))
+    
+    parser.add_argument('-ri','--rwc_inf', default=50, 
+                        help='lower percentage boundary of RWC [0 .. 100]',                         
+                        type=float_range(0,100))
+
 
     args = parser.parse_args()
 
@@ -105,6 +136,12 @@ if __name__=="__main__":
     fit_exp_rmse = args.fit_exp_rmse
     fit_exp_diff = args.fit_exp_diff
 
+    rwc_inf = args.rwc_inf
+    rwc_sup = args.rwc_sup
+
+    assert rwc_inf+rwc_sup < 100, 'sum of rwc boundaries should be < 100'
+    assert rwc_inf < rwc_sup, 'rwc boundary inf should be < to rwc boundary sup'
+
     print('\n')
     print('Parametrizable parameters are :')
     print('--------------------------------\n')
@@ -129,7 +166,9 @@ if __name__=="__main__":
                                    transfo_rmse = transfo_rmse,
                                    transfo_diff = transfo_diff,
                                    fit_exp_rmse = fit_exp_rmse,
-                                   fit_exp_diff = fit_exp_diff
+                                   fit_exp_diff = fit_exp_diff,
+                                   rwc_inf = rwc_inf,
+                                   rwc_sup = rwc_sup
                                   )
     parse_folder.parse_folder()
     
