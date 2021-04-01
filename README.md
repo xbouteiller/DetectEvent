@@ -32,8 +32,8 @@ Eliminated data are highlighted in red
 >
 
 
-##### 2021/03/2021
 
+##### 2021/03/2021
 - It is now possible to select only some ID from a file 
 
 Choose the option 2 when the program starts: select some ID from a file. 
@@ -46,10 +46,10 @@ It is now possible to analyse only the selected ID (one or more).
 
 
 ##### 2021/03/21
-
 - RMSE change detection method is implemented on differentiated signal
 - Arg parser was added : It can be used in order to define manually some parameters before computation
 - Figures are automatically saved to output_fig folder
+
 
 ### Example of uses
 Good results was obtained with the following configuration:
