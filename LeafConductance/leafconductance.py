@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V1.4              ---------------------')
+print('---------------                  V1.5              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -1356,9 +1356,12 @@ class ParseTreeFolder():
         return dffile
         
 
-    def _compute_rwc(self, df, nmean = 100, rwc_thressup = self.rwc_sup, rwc_thresinf = self.rwc_inf, visualise = True):      
+    def _compute_rwc(self, df, nmean = 100,  visualise = True):      
 
         from matplotlib.patches import Circle, Wedge, Polygon
+
+        rwc_thressup = self.rwc_sup
+        rwc_thresinf = self.rwc_inf
 
         dry = np.mean(df[self.YVAR].values[-int(nmean):])
         saturated = np.mean(df[self.YVAR].values[0])
@@ -1373,8 +1376,8 @@ class ParseTreeFolder():
         rwc_sup = find_nearest(rwc, rwc_thressup)
         rwc_inf = find_nearest(rwc, rwc_thresinf)  
 
-        print('Detected RWC SUP at t: {} min'.format(rwc_sup))
-        print('Detected RWC INF at t: {} min'.format(rwc_inf))
+        print('RWC boundary: [{}% .. {}%]'.format(np.round(rwc_sup,2), np.round(rwc_inf,2)))
+        
 
 
 
@@ -1393,8 +1396,9 @@ class ParseTreeFolder():
         t80 = np.min(df.loc[rwc == rwc_sup, "delta_time"].values)
         t50 = np.max(df.loc[rwc == rwc_inf, "delta_time"].values)
 
-        print('Detected RWC {} at {}'.format(rwc_thressup,t80))
-        print('Detected RWC {} at {}'.format(rwc_thresinf,t50))
+        print('Detected RWC SUP {}% at {} min'.format(rwc_thressup,t80))
+        print('Detected RWC INF {}% at {} min'.format(rwc_thresinf,t50))
+        
 
         TITLE = str(df[self.SAMPLE_ID].unique()[0])
         if visualise:
@@ -1548,7 +1552,7 @@ class ParseTreeFolder():
                     temp_df['transfo_mode'] = self.transfo_rmse
 
                     temp_df['percentage_rwc_sup']=self.rwc_sup
-                    temp_df['percentage_rwc_sup']=self.rwc_inf
+                    temp_df['percentage_rwc_inf']=self.rwc_inf
 
                     temp_df['time_rwc_sup']=t80
                     temp_df['time_rwc_inf']=t50

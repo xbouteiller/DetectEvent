@@ -139,7 +139,7 @@ if __name__=="__main__":
     rwc_inf = args.rwc_inf
     rwc_sup = args.rwc_sup
 
-    assert rwc_inf+rwc_sup < 100, 'sum of rwc boundaries should be < 100'
+    # assert rwc_inf+rwc_sup < 100, 'sum of rwc boundaries should be < 100'
     assert rwc_inf < rwc_sup, 'rwc boundary inf should be < to rwc boundary sup'
 
     print('\n')
@@ -170,6 +170,7 @@ if __name__=="__main__":
                                    rwc_inf = rwc_inf,
                                    rwc_sup = rwc_sup
                                   )
+
     parse_folder.parse_folder()
     
     parse_folder.run()

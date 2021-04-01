@@ -1,18 +1,36 @@
 # Python Program for computing leaf conductance and detecting curve's changing point
 
 
-Current version is: **1.4**
+Current version is: **1.5**
 
 <img src="img/2021-03-08_15-43_1.png" width="75%" height="75%">
 
 ## What's new in this release ?
 
 ### Major changes
+
+
+#### 2021/04/01
+- filter data file on Relative Water Content (RWC)
+- it is possible to define superior and inferior threshold for slicing data file based on RWC (default: 80% and 50%)
+>
+> python Leaf_exec.py --rwc_inf 20 --rwc_sup 90 #equivalent to 
+> python Leaf_exec.py -ri 20 -rs 90
+>
+
+<img src="img/B22_LITU_BL_09.png" width="75%" height="75%">
+
+Defined RWC threshold and corresponding time are stored within the recap .csv file
+
+
+
+#### 2021/03/2021
+- It is now possible to select only some ID from a file 
+
+#### 2021/03/21
 - RMSE change detection method is implemented on differentiated signal
 - Arg parser was added : It can be used in order to define manually some parameters before computation
-- Figures are atuomatically saved to output_fig folder
-
-- It is now possible to select only some ID from a file (2021/03/21)
+- Figures are automatically saved to output_fig folder
 
 ### Example of uses
 Good results was obtained with the following configuration:
