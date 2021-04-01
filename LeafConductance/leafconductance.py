@@ -1411,24 +1411,30 @@ class ParseTreeFolder():
             color = 'tab:blue'
             ax1.set_xlabel('time (min)')
             ax1.set_ylabel(TITLE + '\nWeight (g)', color=color)
-            ax1.plot(df['delta_time'], df[self.YVAR], color=color, linestyle='-', marker='.', label = 'data')
+            ax1.plot(df['delta_time'], df[self.YVAR], color=color, linestyle='-', marker='.', label = 'data', alpha = 0.5)
             ax1.tick_params(axis='y', labelcolor=color)
-            color = 'tab:red'
+            ax1.set_ylim([0.9*np.min(df[self.YVAR]), 1.1*np.max(df[self.YVAR])])
 
-            verts = [[0, 0],[t80, 0], [t80, np.max(df[self.YVAR].values)] , [0, np.max(df[self.YVAR].values)]]
+           
+
+            verts = [[0, 0],[t80, 0], [t80, 1.1*np.max(df[self.YVAR].values)] , [0, 1.1*np.max(df[self.YVAR].values)]]
             poly = Polygon(verts, facecolor='r', alpha = 0.5)
             ax1.add_patch(poly)   
 
-            verts = [[t50, 0],[np.max(df['delta_time'].values), 0], [np.max(df['delta_time'].values), np.max(df[self.YVAR].values)], [t50, np.max(df[self.YVAR].values)] ]
+            verts = [[t50, 0],[np.max(df['delta_time'].values), 0], [np.max(df['delta_time'].values), 1.1*np.max(df[self.YVAR].values)], [t50, 1.1*np.max(df[self.YVAR].values)] ]
             poly = Polygon(verts, facecolor='r', alpha = 0.5)
             ax1.add_patch(poly)
+
 
 
             ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
             color = 'tab:green' 
             ax2.set_ylabel('RWC (%)', color=color)  # we already handled the x-label with ax1
-            ax2.plot(df['delta_time'],  rwc, color=color, marker='.', label = 'RWC')
-            ax2.tick_params(axis='y', labelcolor=color)
+            ax2.plot(df['delta_time'],  rwc, color=color, marker='.', label = 'RWC', alpha = 0.5)
+            ax2.tick_params(axis='y', labelcolor=color) 
+
+
+
 
             # Make the shaded region
                         
