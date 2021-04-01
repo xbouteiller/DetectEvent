@@ -10,7 +10,7 @@ Current version is: **1.5**
 ### Major changes
 
 
-#### 2021/04/01
+##### 2021/04/01
 - filter data file on Relative Water Content (RWC)
 - it is possible to define superior and inferior threshold for slicing data file based on RWC (default: 80% and 50%)
 >
@@ -27,7 +27,7 @@ Defined RWC threshold and corresponding time are stored within the recap .csv fi
 
 
 
-#### 2021/03/2021
+##### 2021/03/2021
 - It is now possible to select only some ID from a file 
 
 Choose the option 2 when the program starts: select some ID from a file. 
@@ -39,7 +39,7 @@ It is now possible to analyse only the selected ID (one or more).
 
 
 
-#### 2021/03/21
+##### 2021/03/21
 - RMSE change detection method is implemented on differentiated signal
 - Arg parser was added : It can be used in order to define manually some parameters before computation
 - Figures are automatically saved to output_fig folder
