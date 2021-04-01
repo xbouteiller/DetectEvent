@@ -31,11 +31,11 @@ Defined RWC threshold and corresponding time are stored within the recap .csv fi
 - It is now possible to select only some ID from a file 
 
 Choose the option 2 when the program starts: select some ID from a file. 
-<img src="img/Screenshot from 2021-04-01 17-31-30.png" width="65%" height="65%">
+<img src="img/Screenshot from 2021-04-01 17-31-30.png" width="85%" height="85%">
 
 
 It is now possible to analyse only the selected ID (one or more).
-<img src="img/Screenshot from 2021-04-01 17-18-09.png" width="65%" height="65%">
+<img src="img/Screenshot from 2021-04-01 17-18-09.png" width="85%" height="85%">
 
 
 
