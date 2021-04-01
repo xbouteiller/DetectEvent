@@ -15,10 +15,13 @@ Current version is: **1.5**
 - it is possible to define superior and inferior threshold for slicing data file based on RWC (default: 80% and 50%)
 >
 > python Leaf_exec.py --rwc_inf 20 --rwc_sup 90 #equivalent to 
+> 
 > python Leaf_exec.py -ri 20 -rs 90
 >
 
-<img src="img/B22_LITU_BL_09.png" width="75%" height="75%">
+<img src="img/B22_LITU_BL_09.png" width="65%" height="65%">
+Eliminated data are highlighted in red
+
 
 Defined RWC threshold and corresponding time are stored within the recap .csv file
 
@@ -26,6 +29,15 @@ Defined RWC threshold and corresponding time are stored within the recap .csv fi
 
 #### 2021/03/2021
 - It is now possible to select only some ID from a file 
+
+Choose the option 2 when the program starts: select some ID from a file. 
+<img src="img/Screenshot from 2021-04-01 17-31-30.png" width="65%" height="65%">
+
+
+It is now possible to analyse only the selected ID (one or more).
+<img src="img/Screenshot from 2021-04-01 17-18-09.png" width="65%" height="65%">
+
+
 
 #### 2021/03/21
 - RMSE change detection method is implemented on differentiated signal
