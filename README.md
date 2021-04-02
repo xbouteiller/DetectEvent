@@ -17,7 +17,7 @@ Current version is: **1.5**
 
 
 >
-> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20 # Here the superior threshold is defined as 90% and the inferior as 20%  
+> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20 # Superior threshold : 90%, inferior : 20%  
 > 
 > python Leaf_exec.py -rs 90 -ri 20 # It is a shortcut for the code above
 >
@@ -25,7 +25,7 @@ Current version is: **1.5**
 <img src="img/B22_LITU_BL_09.png" width="65%" height="65%">
 Eliminated data are highlighted in red
 
-<br> </br>
+
 
 - RWC defined thresholds and corresponding time are stored within the .csv recap file
 - If you want to keep the complete dataset you can choose to keep the values between RWC sup 100% and RWC inf 0%
