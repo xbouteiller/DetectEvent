@@ -15,9 +15,14 @@ Current version is: **1.5**
 - RWC = 100*((fresh-dry)/(saturated-dry))
 - It is possible to manually define superior and inferior threshold for slicing the data (default: 80% and 50%)
 >
-> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20 # here superior threshold is defined as 90% and inferior as 20%  
+>  # here superior threshold is defined as 90% and inferior as 20%  
+>
+> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20
+>
+>
+> # it is a shortcut for the code above
 > 
-> python Leaf_exec.py -rs 90 -ri 20 # it is a shortcut for the code above
+> python Leaf_exec.py -rs 90 -ri 20 
 >
 
 <img src="img/B22_LITU_BL_09.png" width="65%" height="65%">
@@ -26,7 +31,7 @@ Eliminated data are highlighted in red
 <br> </br>
 
 - RWC defined thresholds and corresponding time are stored within the .csv recap file
-- If you want to keep the complete dataset you can choose to keep the valeus between RWC sup 100% and RWC inf 0%
+- If you want to keep the complete dataset you can choose to keep the values between RWC sup 100% and RWC inf 0%
 
 >
 > python Leaf_exec.py --rwc_sup 100 --rwc_inf 0 
@@ -55,16 +60,16 @@ It is now possible to analyse only the selected ID (one or more).
         - Allow to transform the data before fitting a model on it
         - rmse: refers to the RMSE method, diff refers to the differentiation method
         - choice are **1**, **2**, **3** & **4**
-        - 1: No transformation
-        - 2: log() the data from the end
-        - 3: 1/exp() the data from the beginning
-        - 4: both log() the data from the end and 1/exp() the data from the beginning
+            - 1: No transformation
+            - 2: log() the data from the end
+            - 3: 1/exp() the data from the beginning
+            - 4: both log() the data from the end and 1/exp() the data from the beginning
     - fit_exp_rmse & fit_exp_diff
         - Allow to chose the shape of the model fitted on the data **from the beginning** for calculating RMSE (from the end, it is always a linear model that is fitted)
         - rmse: refers to the RMSE method, diff refers to the differentiation method
         - choice are **1** or **2**,
-        - 1: fit the A*exp-B*t model from the beginning of the signal
-        - 2: fit a linear model from the beginning of the signal
+            - 1: fit the A*exp-B*t model from the beginning of the signal
+            - 2: fit a linear model from the beginning of the signal
     
 
 
