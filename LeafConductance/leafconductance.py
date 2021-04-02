@@ -851,6 +851,7 @@ class ParseTreeFolder():
                         os.makedirs(fig_folder)
                         os.makedirs(fig_folder+'/'+'rmse')
                         os.makedirs(fig_folder+'/'+'diff')
+                        os.makedirs(fig_folder+'/'+'rwc')
                         break
                 self.fig_folder = fig_folder                
 
@@ -975,6 +976,7 @@ class ParseTreeFolder():
                                     os.makedirs(fig_folder)
                                     os.makedirs(fig_folder+'/'+'rmse')
                                     os.makedirs(fig_folder+'/'+'diff')
+                                    os.makedirs(fig_folder+'/'+'rwc')
                                     break
                             self.fig_folder = fig_folder                
 
@@ -1637,6 +1639,7 @@ class ParseTreeFolder():
                     os.makedirs(fig_folder)
                     os.makedirs(fig_folder+'/'+'rmse')
                     os.makedirs(fig_folder+'/'+'diff')
+                    os.makedirs(fig_folder+'/'+'rwc')
                     break
             self.fig_folder = fig_folder                
 
