@@ -15,13 +15,11 @@ Current version is: **1.5**
 - RWC = 100*((fresh-dry)/(saturated-dry))
 - It is possible to manually define superior and inferior threshold for slicing the data (default: 80% and 50%)
 
-Here the superior threshold is defined as 90% and the inferior as 20%  
->
-> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20
 
-It is a shortcut for the code above
+>
+> python Leaf_exec.py --rwc_sup 90 --rwc_inf 20 # Here the superior threshold is defined as 90% and the inferior as 20%  
 > 
-> python Leaf_exec.py -rs 90 -ri 20 
+> python Leaf_exec.py -rs 90 -ri 20 # It is a shortcut for the code above
 >
 
 <img src="img/B22_LITU_BL_09.png" width="65%" height="65%">
