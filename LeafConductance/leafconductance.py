@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V1.5              ---------------------')
+print('---------------                  V1.6              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -1165,6 +1165,9 @@ class ParseTreeFolder():
                 df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
 
             ################# PUT HERE THE RWC METHOD
+            df, t80, t50 = self._compute_rwc(df)
+            self.t80 = t80
+            self.t50 = t50
             #########################################
 
             self.Xselected = df['delta_time'].values
@@ -1381,19 +1384,25 @@ class ParseTreeFolder():
         print('RWC boundary: [{}% .. {}%]'.format(np.round(rwc_sup,2), np.round(rwc_inf,2)))
         
 
+        try:
+            df['delta_time']
+        except:
 
+            def compute_time_lag(df):
+                df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
+                # compute time delta between measures
+                # WARNING : the points need to be regurlarly sampled with a constant frequency
+                df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
+                # convert time to minute
+                df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
 
-        def compute_time_lag(df):
-            df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
-            # compute time delta between measures
-            # WARNING : the points need to be regurlarly sampled with a constant frequency
-            df['delta_time'] = (df['TIME_COL2']-df['TIME_COL2'][0])   
-            # convert time to minute
-            df['delta_time'] = df['delta_time'].dt.total_seconds() / 60 # minutes 
+                return df
+            
+            df = compute_time_lag(df)
 
-            return df
-        
-        df = compute_time_lag(df)
+        # print(df.head(10))
+        # print(df.tail(10))
+
 
         t80 = np.min(df.loc[rwc == rwc_sup, "delta_time"].values)
         t50 = np.max(df.loc[rwc == rwc_inf, "delta_time"].values)
@@ -1538,7 +1547,7 @@ class ParseTreeFolder():
                     dffile = self._robust_import(elem)          
                     
                     # fit after rwc removal, if you want to use the full curve set tinf to 0 and tsup to 100
-                    dffile, t80, t50 = self._compute_rwc(dffile)
+                    # dffile, t80, t50 = self._compute_rwc(dffile)
                     
                     # future : do i need to use global var as self.globalscore ... ?
                     self._parse_samples(dffile = dffile, FUNC = self._change_det)
@@ -1562,8 +1571,8 @@ class ParseTreeFolder():
                     temp_df['percentage_rwc_sup']=self.rwc_sup
                     temp_df['percentage_rwc_inf']=self.rwc_inf
 
-                    temp_df['time_rwc_sup']=t80
-                    temp_df['time_rwc_inf']=t50
+                    temp_df['time_rwc_sup']=self.t80
+                    temp_df['time_rwc_inf']=self.t50
 
                     # append df to list
                     list_of_df.append(temp_df)
