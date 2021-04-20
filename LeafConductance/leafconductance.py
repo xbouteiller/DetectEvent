@@ -22,7 +22,7 @@ colors = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 print('------------------------------------------------------------------------')
 print('---------------                                    ---------------------')
 print('---------------            LeafConductance         ---------------------')
-print('---------------                  V1.6              ---------------------')
+print('---------------                  V1.7              ---------------------')
 print('---------------                                    ---------------------')
 print('------------------------------------------------------------------------')
 time.sleep(0.5)
@@ -1361,7 +1361,7 @@ class ParseTreeFolder():
         return dffile
         
 
-    def _compute_rwc(self, df, nmean = 100,  visualise = True):      
+    def _compute_rwc(self, df, nmean = 20,  visualise = True):      
 
         from matplotlib.patches import Circle, Wedge, Polygon
 
@@ -1387,7 +1387,6 @@ class ParseTreeFolder():
         try:
             df['delta_time']
         except:
-
             def compute_time_lag(df):
                 df['TIME_COL2'] = pd.to_datetime(df[self.TIME_COL] , infer_datetime_format=True)  
                 # compute time delta between measures
@@ -1409,6 +1408,17 @@ class ParseTreeFolder():
 
         print('Detected RWC SUP {}% at {} min'.format(rwc_thressup,t80))
         print('Detected RWC INF {}% at {} min'.format(rwc_thresinf,t50))
+        
+
+        if t80>t50:
+            print('Warning, time at {}%: {} min, should be less than than time at {}%: {} min'.format(rwc_thressup,t80, rwc_thresinf,t50))
+            print('keeping full data set')
+
+            t80 = df['delta_time'].values[0]
+            t50 = df['delta_time'].values[-1]
+
+            print('New: Detected RWC SUP 0% at {} min'.format(t80))
+            print('New: Detected RWC INF 100% at {} min'.format(t50))
         
 
         TITLE = str(df[self.SAMPLE_ID].unique()[0])
