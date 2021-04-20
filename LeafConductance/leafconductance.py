@@ -1369,7 +1369,7 @@ class ParseTreeFolder():
         rwc_thresinf = self.rwc_inf
 
         dry = np.mean(df[self.YVAR].values[-int(nmean):])
-        saturated = np.mean(df[self.YVAR].values[0])
+        saturated = np.mean(df[self.YVAR].values[0:nmean])## or np.max() ??
         rwc = 100*((df[self.YVAR].values-dry)/(saturated-dry))            
 
         def find_nearest(a, a0):
@@ -1410,7 +1410,7 @@ class ParseTreeFolder():
         print('Detected RWC INF {}% at {} min'.format(rwc_thresinf,t50))
         
 
-        if t80>t50:
+        if t80>=t50:
             print('Warning, time at {}%: {} min, should be less than than time at {}%: {} min'.format(rwc_thressup,t80, rwc_thresinf,t50))
             print('keeping full data set')
 
