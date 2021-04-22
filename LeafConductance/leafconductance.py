@@ -408,7 +408,7 @@ class ParseTreeFolder():
             if mode2 == 'diff':
                 # log data for the linear phase of the fit only if 2 or 4 were chosen
                 if self.transfo_diff == '2' or self.transfo_diff == '4':
-                    yarr =  1/np.exp(yarr) #np.sqrt(yarr)# 
+                    yarr =  np.log(yarr+1)#1/np.exp(yarr) #np.sqrt(yarr)# 
                     #print('transfo y lin')
             
             if mode2 == 'raw' or mode2 == 'diff':              
